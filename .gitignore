@@ -20,8 +20,8 @@
 *.snm
 *.vrb
 
-# Generated PDFs
-*.pdf
+# Generated PDFs (commented out to allow tracking of report.pdf)
+# *.pdf
 
 # macOS
 .DS_Store
