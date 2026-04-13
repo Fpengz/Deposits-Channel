@@ -75,7 +75,7 @@ if mode == "Theory & Simulation":
         hovermode="x unified",
         template="plotly_white"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.divider()
     st.subheader("Concentration Analysis: How Market Power Amplifies the Channel")
@@ -89,7 +89,7 @@ if mode == "Theory & Simulation":
     fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_high, name="High Concentration (HHI=0.8)", line=dict(color='#d62728', dash='dot')))
     fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_low, name="Low Concentration (HHI=0.2)", line=dict(color='#2ca02c')))
     fig_hhi.update_layout(title="HHI Impact: Deposit Supply Curve", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
-    st.plotly_chart(fig_hhi, use_container_width=True)
+    st.plotly_chart(fig_hhi, width='stretch')
     st.info("The Deposits Channel is more potent in concentrated markets. Higher HHI = Steeper deposit supply curve.")
 
 else:
@@ -125,7 +125,7 @@ else:
             hovermode="x unified",
             template="plotly_white"
         )
-        st.plotly_chart(fig_ts, use_container_width=True)
+        st.plotly_chart(fig_ts, width='stretch')
         
         st.divider()
 
@@ -144,7 +144,7 @@ else:
             aspect="auto"
         )
         fig_heat.update_layout(template="plotly_white")
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.plotly_chart(fig_heat, width='stretch')
         
         st.divider()
         
@@ -182,7 +182,7 @@ else:
         y_fit = res.params['const'] + res.params['d_ff'] * x_range
         fig_ols.add_trace(go.Scatter(x=x_range, y=y_fit, mode='lines', name='Linear Fit', line=dict(color='#d62728', width=2)))
         fig_ols.update_layout(title="Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title="$\Delta$ Rate (%)", yaxis_title="Bank ETF Return", template="plotly_white")
-        st.plotly_chart(fig_ols, use_container_width=True)
+        st.plotly_chart(fig_ols, width='stretch')
 
         st.divider()
 
@@ -193,7 +193,7 @@ else:
         
         fig_roll = go.Figure(data=go.Scatter(x=rolling_beta.index, y=rolling_beta, mode='lines', name='Beta', line=dict(color='#9467bd')))
         fig_roll.update_layout(title=f"Rolling {window}-Day Beta (Sensitivity to Rates)", xaxis_title="Date", yaxis_title="Beta Coefficient", template="plotly_white")
-        st.plotly_chart(fig_roll, use_container_width=True)
+        st.plotly_chart(fig_roll, width='stretch')
         st.info("A negative beta means the bank sector tends to underperform when rates rise, consistent with the Deposits Channel.")
 
     else:
