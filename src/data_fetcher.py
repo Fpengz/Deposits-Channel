@@ -59,3 +59,19 @@ def get_proxy_deposits() -> pd.DataFrame:
 def get_proxy_regional_banks() -> pd.DataFrame:
     """Returns the iShares Regional Banks ETF (IAT) as a proxy."""
     return fetch_market_data('IAT')
+
+def get_proxy_market() -> pd.DataFrame:
+    """Returns the S&P 500 ETF (SPY) as a market proxy."""
+    return fetch_market_data('SPY')
+
+def get_proxy_mmf() -> pd.DataFrame:
+    """Returns Vanguard Federal MMF (VMFXX) as a proxy."""
+    return fetch_market_data('VMFXX')
+
+def get_proxy_10y_yield() -> pd.DataFrame:
+    """Returns 10-Year Treasury Note Yield (^TNX)."""
+    return fetch_market_data('^TNX')
+
+def get_proxy_credit_ig() -> pd.DataFrame:
+    """Returns iShares Investment Grade Corporate Bond ETF (LQD)."""
+    return fetch_market_data('LQD')
