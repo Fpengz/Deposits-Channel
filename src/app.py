@@ -87,7 +87,8 @@ with tab1:
     volumes = [calculate_deposit_volume(base_volume, r - calculate_deposit_rate(r, market_power), elasticity) for r in rates]
 
     fig = go.Figure(data=go.Scatter(x=[r*100 for r in rates], y=volumes, mode='lines', name='Theoretical Volume', line=dict(color='#1f77b4', width=3)))
-    fig.add_vline(x=fed_funds_rate*100, line_dash="dash", line_color="#ff7f0e", annotation_text="Current Rate")
+    fig.add_vline(x=fed_funds_rate*100, line_dash="dash", line_color="#ff7f0e")
+    fig.add_annotation(x=fed_funds_rate*100, text="Current Rate", showarrow=False, y=1, yref="paper", textangle=-90, yanchor="bottom")
     fig.update_layout(title="Theoretical Deposit Volume vs Fed Funds Rate", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
     st.plotly_chart(fig, width='stretch')
 
@@ -232,7 +233,8 @@ with tab5:
         fig_svb = go.Figure()
         fig_svb.add_trace(go.Scatter(x=crisis_data.index, y=crisis_data['KBE'], name="Broad Banks (KBE)"))
         fig_svb.add_trace(go.Scatter(x=crisis_data.index, y=crisis_data['IAT'], name="Regional Banks (IAT)", line=dict(width=4, color='red')))
-        fig_svb.add_vline(x='2023-03-10', line_dash="dash", line_color="black", annotation_text="SVB Collapse")
+        fig_svb.add_vline(x=pd.to_datetime('2023-03-10'), line_dash="dash", line_color="black")
+        fig_svb.add_annotation(x=pd.to_datetime('2023-03-10'), text="SVB Collapse", showarrow=False, y=1, yref="paper", textangle=-90, yanchor="bottom")
         fig_svb.update_layout(title="KBE vs IAT: The Regional Divergence", yaxis_title="Price ($)", template="plotly_white")
         st.plotly_chart(fig_svb, width='stretch')
         
