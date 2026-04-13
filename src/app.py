@@ -123,7 +123,8 @@ with tab2:
             for d in fomc_dates:
                 dt = pd.to_datetime(d)
                 if dt in data.index:
-                    fig_ts.add_vline(x=dt, line_dash="dot", line_color="gray", annotation_text="FOMC")
+                    fig_ts.add_vline(x=dt, line_dash="dot", line_color="gray")
+                    fig_ts.add_annotation(x=dt, text="FOMC", showarrow=False, y=1, yref="paper", textangle=-90, yanchor="bottom")
             fig_ts.update_layout(yaxis=dict(title="Yield (%)", side="left"), yaxis2=dict(title="ETF Price", side="right", overlaying="y", showgrid=False), template="plotly_white")
             st.plotly_chart(fig_ts, width='stretch')
 
