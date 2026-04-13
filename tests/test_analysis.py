@@ -5,7 +5,8 @@ from src.analysis import (
     run_ols_regression, 
     check_stationarity, 
     calculate_rolling_beta, 
-    estimate_var_forecast
+    estimate_var_forecast,
+    calculate_correlation_matrix
 )
 
 def test_run_ols_regression():
@@ -24,7 +25,6 @@ def test_check_stationarity():
     t = np.linspace(0, 1, 1000)
     series = 5 * t + np.random.normal(0, 0.1, 1000)
     p_value = check_stationarity(pd.Series(series))
-    # p-value for trend is usually high in ADF if not detrended
     assert p_value > 0.05
 
 def test_calculate_rolling_beta():
@@ -52,3 +52,8 @@ def test_estimate_var_forecast():
     
     forecast = estimate_var_forecast(df, steps=5)
     assert forecast.shape == (5, 2)
+
+def test_calculate_correlation_matrix():
+    df = pd.DataFrame({'A': [1, 2, 3], 'B': [3, 2, 1]})
+    corr = calculate_correlation_matrix(df)
+    assert corr.loc['A', 'B'] == pytest.approx(-1.0)
