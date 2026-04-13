@@ -120,8 +120,8 @@ else:
         fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['Bank_ETF'], name="Bank ETF Price ($)", yaxis="y2", line=dict(color='#ff7f0e')))
         fig_ts.update_layout(
             title="Time Series: Rates vs Bank Stock Price",
-            yaxis=dict(title="Yield (%)", side="left", titlefont=dict(color="#1f77b4"), tickfont=dict(color="#1f77b4")),
-            yaxis2=dict(title="Price ($)", side="right", overlaying="y", showgrid=False, titlefont=dict(color="#ff7f0e"), tickfont=dict(color="#ff7f0e")),
+            yaxis=dict(title=dict(text="Yield (%)", font=dict(color="#1f77b4")), side="left", tickfont=dict(color="#1f77b4")),
+            yaxis2=dict(title=dict(text="Price ($)", font=dict(color="#ff7f0e")), side="right", overlaying="y", showgrid=False, tickfont=dict(color="#ff7f0e")),
             hovermode="x unified",
             template="plotly_white"
         )
