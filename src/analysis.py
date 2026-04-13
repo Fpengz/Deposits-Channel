@@ -47,3 +47,24 @@ def estimate_var_forecast(df: pd.DataFrame, steps: int = 5) -> np.ndarray:
 def calculate_correlation_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """Returns the correlation matrix of a dataframe."""
     return df.corr()
+
+def calculate_cross_correlation(s1: pd.Series, s2: pd.Series, max_lag: int = 15):
+    """Calculates cross-correlation between two series at various lags."""
+    lags = range(-max_lag, max_lag + 1)
+    # Ensure they are aligned and normalized for better correlation values
+    s1_norm = (s1 - s1.mean()) / (s1.std() * len(s1))
+    s2_norm = (s2 - s2.mean()) / s2.std()
+    coeffs = np.correlate(s1_norm, s2_norm, mode='full')
+    # Match the range of lags
+    mid = len(coeffs) // 2
+    coeffs = coeffs[mid - max_lag : mid + max_lag + 1]
+    return list(lags), list(coeffs)
+
+def detect_monetary_regimes(ff_series: pd.Series, window: int = 20) -> pd.Series:
+    """Detects 'Hiking' vs 'Easing' regimes based on a rolling average of proxy changes."""
+    # Smoothed change to avoid noise
+    change = ff_series.diff().rolling(window=window).mean()
+    regimes = pd.Series('Stable', index=ff_series.index)
+    regimes[change > 0.0001] = 'Hiking'
+    regimes[change < -0.0001] = 'Easing'
+    return regimes
