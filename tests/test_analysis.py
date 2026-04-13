@@ -8,8 +8,23 @@ from src.analysis import (
     estimate_var_forecast,
     calculate_correlation_matrix,
     calculate_cross_correlation,
-    detect_monetary_regimes
+    detect_monetary_regimes,
+    calculate_recursive_ols,
+    run_monte_carlo_simulation
 )
+...
+def test_calculate_recursive_ols():
+    x = np.linspace(0, 10, 100)
+    y = 2 * x + np.random.normal(0, 0.1, 100)
+    df = pd.DataFrame({'y': y, 'x': x})
+    betas, se = calculate_recursive_ols(df, 'y', 'x')
+    assert len(betas) == 100
+    assert betas.iloc[-1] == pytest.approx(2, rel=0.1)
+
+def test_run_monte_carlo_simulation():
+    res = run_monte_carlo_simulation(0.05, 0.5, 10000, 10, trials=100)
+    assert len(res) == 100
+    assert np.all(res >= 0)
 
 def test_run_ols_regression():
     # Generate dummy data

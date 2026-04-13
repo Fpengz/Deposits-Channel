@@ -4,8 +4,11 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import statsmodels.api as sm
+import warnings
+# Suppress statsmodels frequency warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="statsmodels")
 from simulation import calculate_deposit_rate, calculate_deposit_volume
-from data_fetcher import get_proxy_fed_funds, get_proxy_deposits, get_proxy_regional_banks, get_proxy_market
+from data_fetcher import get_proxy_fed_funds, get_proxy_deposits, get_proxy_regional_banks, get_proxy_market, get_proxy_mmf, get_proxy_10y_yield, get_proxy_credit_ig
 from analysis import (
     run_ols_regression, 
     check_stationarity, 
@@ -14,15 +17,17 @@ from analysis import (
     calculate_cross_correlation,
     detect_monetary_regimes,
     calculate_recursive_ols,
-    run_monte_carlo_simulation
+    run_monte_carlo_simulation,
+    calculate_yield_curve_slope,
+    calculate_credit_spread
 )
 
 st.set_page_config(page_title="Deposits Channel Research Terminal", layout="wide")
 
-st.title("The Deposits Channel: Research Terminal v3.0")
+st.title("The Deposits Channel: Macro-Finance Terminal v4.0")
 st.markdown("""
-This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)**. 
-Use the tabs below to switch between theoretical modeling, empirical evidence, and risk stress tests.
+This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)** across multiple asset classes. 
+Use the tabs below to explore the "Flow of Funds", Yield Curve interactions, and recent banking stress.
 """)
 
 # Sidebar Navigation & Global Filters
@@ -32,8 +37,15 @@ st.sidebar.subheader("Global Timeframe")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime('2018-01-01'))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime('today'))
 
-# 3-Tab Structure
-tab1, tab2, tab3 = st.tabs(["Theory & Simulation", "Empirical Terminal", "Risk Stress Test"])
+# 5-Tab Structure
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Theory & Simulation", 
+    "Empirical Terminal", 
+    "Macro Interactions", 
+    "Credit & Lending", 
+    "2023 Case Study"
+])
+
 
 with tab1:
     st.header("Theoretical Model")
@@ -154,30 +166,97 @@ with tab2:
             st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='Viridis', template="plotly_white"), width='stretch')
 
 with tab3:
-    st.header("Risk stress Test")
+    st.header("Macro Interactions: MMFs & Yield Curve")
+    with st.spinner("Analyzing macro interactions..."):
+        mmf_proxy = get_proxy_mmf()
+        tnx_proxy = get_proxy_10y_yield()
+        
+    if not mmf_proxy.empty and not tnx_proxy.empty:
+        macro_merged = ff_proxy.join(mmf_proxy, lsuffix='_ff', rsuffix='_mmf').join(tnx_proxy, rsuffix='_tnx').dropna()
+        macro_merged.columns = ['FF_Proxy', 'MMF_Price', 'Ten_Year']
+        macro_data = macro_merged[(macro_merged.index >= pd.to_datetime(start_date)) & (macro_merged.index <= pd.to_datetime(end_date))]
+        
+        # 1. MMF Destination
+        st.subheader("1. Deposits Destination: Money Market Funds")
+        st.markdown("As bank spreads widen, deposits flow into MMFs. We proxy this with the price/performance of VMFXX.")
+        fig_mmf = go.Figure()
+        fig_mmf.add_trace(go.Scatter(x=macro_data.index, y=macro_data['FF_Proxy'], name="Fed Funds Proxy (%)", yaxis="y1"))
+        fig_mmf.add_trace(go.Scatter(x=macro_data.index, y=macro_data['MMF_Price'], name="MMF Price (VMFXX)", yaxis="y2"))
+        fig_mmf.update_layout(yaxis=dict(title="Yield (%)"), yaxis2=dict(title="Price ($)", overlaying="y", side="right", showgrid=False), template="plotly_white")
+        st.plotly_chart(fig_mmf, width='stretch')
+        
+        # 2. Yield Curve Slope
+        st.subheader("2. Yield Curve & The Deposits Channel")
+        st.markdown("The paper argues the channel is more strained when the curve is flat or inverted (low slope).")
+        macro_data['Slope'] = calculate_yield_curve_slope(macro_data['Ten_Year'], macro_data['FF_Proxy'])
+        fig_slope = go.Figure(data=go.Scatter(x=macro_data.index, y=macro_data['Slope'], name="10Y-3M Slope", fill='tozeroy'))
+        fig_slope.add_hline(y=0, line_dash="dash", line_color="red")
+        fig_slope.update_layout(title="Yield Curve Slope (Ten Year - Fed Funds Proxy)", yaxis_title="Spread (%)", template="plotly_white")
+        st.plotly_chart(fig_slope, width='stretch')
+
+with tab4:
+    st.header("Credit & Lending: Transmission to Real Economy")
+    with st.spinner("Calculating credit spreads..."):
+        lqd_proxy = get_proxy_credit_ig()
+        
+    if not lqd_proxy.empty:
+        credit_merged = ff_proxy.join(lqd_proxy, rsuffix='_lqd').join(spy_proxy, rsuffix='_spy').dropna()
+        credit_merged.columns = ['FF_Proxy', 'Credit_Price', 'SPY']
+        credit_data = credit_merged[(credit_merged.index >= pd.to_datetime(start_date)) & (credit_merged.index <= pd.to_datetime(end_date))]
+        
+        # Calculate proxy spread stress
+        # Higher index = higher cost of credit relative to risk-free
+        credit_data['Spread_Stress'] = calculate_credit_spread(credit_data['Credit_Price'], credit_data['FF_Proxy'] / 100 + 1) # Normalizing
+        
+        st.subheader("1. Lending Conditions Proxy")
+        st.markdown("Widening credit 'stress' indicates a contraction in bank lending supply as deposits leave the system.")
+        fig_credit = px.line(credit_data, y='Credit_Price', title="Investment Grade Credit Price (LQD)", labels={'Credit_Price': 'Price ($)'}, template="plotly_white")
+        st.plotly_chart(fig_credit, width='stretch')
+        
+        st.info("When rates rise and deposits exit, banks must contract their balance sheets, leading to lower credit availability and higher spreads.")
+
+with tab5:
+    st.header("Case Study: March 2023 Banking Stress")
     st.markdown("""
-    This section uses **Monte Carlo Simulation** to project potential deposit volume outcomes based on 1,000 random 
-    interest rate paths starting from the current level.
+    March 2023 represented a 'nonlinear' shock where the Deposits Channel mechanism reached a breaking point 
+    for regional banks like SVB.
     """)
     
+    # Zoom in on 2023
+    crisis_start = pd.to_datetime('2023-02-01')
+    crisis_end = pd.to_datetime('2023-05-01')
+    crisis_data = merged[(merged.index >= crisis_start) & (merged.index <= crisis_end)]
+    
+    if not crisis_data.empty:
+        st.subheader("The Regional Bank Breaking Point")
+        fig_svb = go.Figure()
+        fig_svb.add_trace(go.Scatter(x=crisis_data.index, y=crisis_data['KBE'], name="Broad Banks (KBE)"))
+        fig_svb.add_trace(go.Scatter(x=crisis_data.index, y=crisis_data['IAT'], name="Regional Banks (IAT)", line=dict(width=4, color='red')))
+        fig_svb.add_vline(x='2023-03-10', line_dash="dash", line_color="black", annotation_text="SVB Collapse")
+        fig_svb.update_layout(title="KBE vs IAT: The Regional Divergence", yaxis_title="Price ($)", template="plotly_white")
+        st.plotly_chart(fig_svb, width='stretch')
+        
+        st.markdown("""
+        **Implications:**
+        - **Sticky no more:** The assumption of deposit stickiness failed as digital banking allowed instant outflows.
+        - **Unrealized Losses:** High interest rates (the X-axis of our model) caused the value of bank-held bonds to drop, 
+          creating the 'hole' that deposit outflows exposed.
+        - **Endogenous Power:** Large banks (KBE) recovered faster as they benefited from a 'flight to safety', 
+          further increasing their market power.
+        """)
+    else:
+        st.warning("Crisis period data not available in current fetch.")
+
+    # Re-add the Risk Test here or as an expander
+    st.divider()
+    st.subheader("Stress Test Simulation")
     if st.button("🚀 Run 1,000 Trial Stress Test"):
         trials = run_monte_carlo_simulation(fed_funds_rate, market_power, base_volume, elasticity)
-        
         fig_hist = px.histogram(trials, nbins=50, title="Distribution of Projected Deposit Volume ($B)", labels={'value': 'Deposit Volume ($B)'}, color_discrete_sequence=['#2ca02c'])
         fig_hist.update_layout(template="plotly_white", showlegend=False)
         st.plotly_chart(fig_hist, width='stretch')
-        
-        # Risk Metrics
         var_95 = np.percentile(trials, 5)
-        expected = np.mean(trials)
-        contraction = (base_volume - var_95) / base_volume * 100
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Current Volume", f"${base_volume:,.0f}B")
-        col2.metric("95% VaR Volume", f"${var_95:,.0f}B")
-        col3.metric("Max Potential Drain", f"{contraction:.1f}%", delta="-Risk Exposure", delta_color="inverse")
-        
-        st.warning(f"In 5% of simulated scenarios, the Deposits Channel causes a drain of more than ${base_volume - var_95:,.0f}B.")
+        st.metric("95% VaR Volume", f"${var_95:,.0f}B", delta=f"-{(base_volume-var_95)/base_volume*100:.1f}% Risk")
 
 st.divider()
 with st.expander("Reference: Drechsler, Savov & Schnabl (2017)"):
