@@ -79,6 +79,17 @@ def run_monte_carlo_simulation(current_rate: float, market_power: float, base_vo
         results.append(final_vol)
     return np.array(results)
 
+def calculate_yield_curve_slope(ten_year: pd.Series, three_month: pd.Series) -> pd.Series:
+    """Calculates the 10Y - 3M yield curve slope."""
+    return ten_year - three_month
+
+def calculate_credit_spread(credit_price: pd.Series, treasury_price: pd.Series) -> pd.Series:
+    """Calculates proxy credit spread using relative price performance."""
+    # Since we fetch prices for LQD, a simple proxy for spread stress is the ratio 
+    # or the difference in cumulative returns.
+    # Higher spread = lower relative price of credit vs treasury
+    return (treasury_price / credit_price)
+
 def calculate_cross_correlation(s1: pd.Series, s2: pd.Series, max_lag: int = 15):
     """Calculates cross-correlation between two series at various lags."""
     lags = range(-max_lag, max_lag + 1)
