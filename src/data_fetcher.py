@@ -55,3 +55,7 @@ def get_proxy_deposits() -> pd.DataFrame:
     """Returns an ETF or index as a proxy for banking sector activity."""
     # KBE is the SPDR S&P Bank ETF
     return fetch_market_data('KBE')
+
+def get_proxy_regional_banks() -> pd.DataFrame:
+    """Returns the iShares Regional Banks ETF (IAT) as a proxy."""
+    return fetch_market_data('IAT')
