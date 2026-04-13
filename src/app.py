@@ -5,37 +5,40 @@ import plotly.graph_objects as go
 import plotly.express as px
 import statsmodels.api as sm
 from simulation import calculate_deposit_rate, calculate_deposit_volume
-from data_fetcher import get_proxy_fed_funds, get_proxy_deposits, get_proxy_regional_banks
+from data_fetcher import get_proxy_fed_funds, get_proxy_deposits, get_proxy_regional_banks, get_proxy_market
 from analysis import (
     run_ols_regression, 
     check_stationarity, 
     calculate_rolling_beta, 
     calculate_correlation_matrix,
     calculate_cross_correlation,
-    detect_monetary_regimes
+    detect_monetary_regimes,
+    calculate_recursive_ols,
+    run_monte_carlo_simulation
 )
 
-st.set_page_config(page_title="Deposits Channel", layout="wide")
+st.set_page_config(page_title="Deposits Channel Research Terminal", layout="wide")
 
-st.title("The Deposits Channel of Monetary Policy")
+st.title("The Deposits Channel: Research Terminal v3.0")
 st.markdown("""
-This dashboard explores the core logic of **Drechsler, Savov & Schnabl (2017)**: *\"The Deposits Channel of Monetary Policy\"*.
+This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)**. 
+Use the tabs below to switch between theoretical modeling, empirical evidence, and risk stress tests.
 """)
 
-# Sidebar Navigation
-st.sidebar.title("Navigation")
-mode = st.sidebar.radio("Select View", ["Theory & Simulation", "Empirical Analysis"])
+# Sidebar Navigation & Global Filters
+st.sidebar.title("Terminal Controls")
+st.sidebar.divider()
+st.sidebar.subheader("Global Timeframe")
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime('2018-01-01'))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime('today'))
 
-if mode == "Theory & Simulation":
+# 3-Tab Structure
+tab1, tab2, tab3 = st.tabs(["Theory & Simulation", "Empirical Terminal", "Risk Stress Test"])
+
+with tab1:
     st.header("Theoretical Model")
     
     st.subheader("The Mechanism: From Rates to Lending")
-    # Fixed Mermaid rendering using st.tabs or just clean st.markdown if supported, 
-    # but st.components.v1.html or a dedicated Mermaid component is more reliable.
-    # For simplicity and reliability in standard Streamlit, we use st.code or a clear step-by-step UI.
-    # However, st.markdown with a mermaid block is supported in modern Streamlit.
-    # Let's use a more robust layout.
-    
     st.markdown(r"""
     ### 1. Fed Funds Rate ↑  $\longrightarrow$  2. Deposit Spread ↑  $\longrightarrow$  3. Deposit Outflow  $\longrightarrow$  4. Bank Lending ↓
     """)
@@ -49,7 +52,6 @@ if mode == "Theory & Simulation":
         st.success("**3. Transmission**\n\nAs deposits flow to Money Market Funds, banks lose their cheapest source of funding and must cut lending.")
 
     st.divider()
-    st.markdown("Use the sliders to see how Fed Rate hikes transmit through sticky deposits.")
     
     # Sidebar for simulation controls
     st.sidebar.header("Simulation Parameters")
@@ -74,210 +76,112 @@ if mode == "Theory & Simulation":
 
     fig = go.Figure(data=go.Scatter(x=[r*100 for r in rates], y=volumes, mode='lines', name='Theoretical Volume', line=dict(color='#1f77b4', width=3)))
     fig.add_vline(x=fed_funds_rate*100, line_dash="dash", line_color="#ff7f0e", annotation_text="Current Rate")
-
-    fig.update_layout(
-        title="Theoretical Deposit Volume vs Fed Funds Rate",
-        xaxis_title="Fed Funds Rate (%)",
-        yaxis_title="Deposit Volume ($B)",
-        hovermode="x unified",
-        template="plotly_white"
-    )
+    fig.update_layout(title="Theoretical Deposit Volume vs Fed Funds Rate", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
     st.plotly_chart(fig, width='stretch')
 
     st.divider()
     st.subheader("Interactive Heatmap: Deposit Spreads")
-    st.markdown("This heatmap shows the **Deposit Spread** (Fed Rate - Deposit Rate) across different levels of market power and interest rates.")
-
-    # Grid for heatmap
     ff_range = np.linspace(0, 0.1, 20)
     mp_range = np.linspace(0, 1.0, 20)
-    # Spread = f - f*(1-mp) = f*mp
     spreads = np.array([[f * mp * 100 for mp in mp_range] for f in ff_range])
-
-    fig_heat_sim = px.imshow(
-        spreads,
-        x=[f"{mp:.1f}" for mp in mp_range],
-        y=[f"{f*100:.1f}%" for f in ff_range],
-        labels=dict(x="Bank Market Power", y="Fed Funds Rate (%)", color="Spread (%)"),
-        color_continuous_scale='Viridis',
-        aspect="auto"
-    )
+    fig_heat_sim = px.imshow(spreads, x=[f"{mp:.1f}" for mp in mp_range], y=[f"{f*100:.1f}%" for f in ff_range], labels=dict(x="Bank Market Power", y="Fed Funds Rate (%)", color="Spread (%)"), color_continuous_scale='Viridis', aspect="auto")
     fig_heat_sim.update_layout(template="plotly_white")
     st.plotly_chart(fig_heat_sim, width='stretch')
 
-    st.divider()
-    st.subheader("Concentration Analysis: How Market Power Amplifies the Channel")
-
-    # Compare High HHI vs Low HHI
-    rates_hhi = [r/100.0 for r in range(0, 1001, 25)]
-    vol_high = [calculate_deposit_volume(10000, r - calculate_deposit_rate(r, 0.8), 10) for r in rates_hhi]
-    vol_low = [calculate_deposit_volume(10000, r - calculate_deposit_rate(r, 0.2), 10) for r in rates_hhi]
-
-    fig_hhi = go.Figure()
-    fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_high, name="High Concentration (HHI=0.8)", line=dict(color='#d62728', dash='dot')))
-    fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_low, name="Low Concentration (HHI=0.2)", line=dict(color='#2ca02c')))
-    fig_hhi.update_layout(title="HHI Impact: Deposit Supply Curve", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
-    st.plotly_chart(fig_hhi, width='stretch')
-    st.info("The Deposits Channel is more potent in concentrated markets. Higher HHI = Steeper deposit supply curve.")
-
-else:
-    st.header("Empirical Analysis")
-    st.markdown("""
-    Replicating the paper's empirical strategy using market proxies. 
-    The paper regresses deposit growth on rate changes to find **Deposit Betas**.
-    """)
+with tab2:
+    st.header("Empirical Terminal")
     
-    # Load Market Data
-    with st.spinner("Fetching market data..."):
+    with st.spinner("Fetching terminal data..."):
         ff_proxy = get_proxy_fed_funds()
         kbe_proxy = get_proxy_deposits()
         iat_proxy = get_proxy_regional_banks()
+        spy_proxy = get_proxy_market()
 
-    if not ff_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty:
-        # Prepare Data
-        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe')
-        merged = merged.join(iat_proxy, rsuffix='_iat').dropna()
-        merged.columns = ['FF_Proxy', 'KBE', 'IAT']
+    if not ff_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty and not spy_proxy.empty:
+        # Merge and Filter
+        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe').join(iat_proxy, rsuffix='_iat').join(spy_proxy, rsuffix='_spy').dropna()
+        merged.columns = ['FF_Proxy', 'KBE', 'IAT', 'SPY']
+        data_full = merged[(merged.index >= pd.to_datetime(start_date)) & (merged.index <= pd.to_datetime(end_date))]
         
-        # Calculate changes/returns
-        merged['d_ff'] = merged['FF_Proxy'].diff()
-        merged['r_kbe'] = merged['KBE'].pct_change()
-        merged['r_iat'] = merged['IAT'].pct_change()
-        data = merged.dropna()
-        
-        # Display raw time series
-        fig_ts = go.Figure()
-        fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['FF_Proxy'], name="FF Proxy Yield (%)", yaxis="y1", line=dict(color='#1f77b4')))
-        fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['KBE'], name="Bank ETF Price ($)", yaxis="y2", line=dict(color='#ff7f0e')))
-        fig_ts.update_layout(
-            title="Time Series: Rates vs Bank Stock Price",
-            yaxis=dict(title=dict(text="Yield (%)", font=dict(color="#1f77b4")), side="left", tickfont=dict(color="#1f77b4")),
-            yaxis2=dict(title=dict(text="Price ($)", font=dict(color="#ff7f0e")), side="right", overlaying="y", showgrid=False, tickfont=dict(color="#ff7f0e")),
-            hovermode="x unified",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig_ts, width='stretch')
-        
-        st.divider()
+        if data_full.empty:
+            st.warning("Selected timeframe has no data overlap.")
+        else:
+            data_full['d_ff'] = data_full['FF_Proxy'].diff()
+            data_full['r_kbe'] = data_full['KBE'].pct_change()
+            data_full['r_iat'] = data_full['IAT'].pct_change()
+            data_full['r_spy'] = data_full['SPY'].pct_change()
+            data = data_full.dropna()
 
-        # 4. Monetary Policy Regime Performance
-        st.subheader("4. Monetary Policy Regime Performance")
-        regimes = detect_monetary_regimes(data['FF_Proxy'])
-        data['Regime'] = regimes
+            # 1. Market Evolution
+            st.subheader("1. Time Series: Sector Benchmarking")
+            fig_ts = go.Figure()
+            fig_ts.add_trace(go.Scatter(x=data.index, y=data['FF_Proxy'], name="FF Proxy (%)", yaxis="y1"))
+            fig_ts.add_trace(go.Scatter(x=data.index, y=data['KBE'], name="Broad Banks (KBE)", yaxis="y2"))
+            fig_ts.add_trace(go.Scatter(x=data.index, y=data['SPY'], name="Market (SPY)", yaxis="y2", line=dict(dash='dash')))
+            # FOMC Events
+            fomc_dates = ['2022-03-16', '2023-03-22', '2023-05-03']
+            for d in fomc_dates:
+                dt = pd.to_datetime(d)
+                if dt in data.index:
+                    fig_ts.add_vline(x=dt, line_dash="dot", line_color="gray", annotation_text="FOMC")
+            fig_ts.update_layout(yaxis=dict(title="Yield (%)", side="left"), yaxis2=dict(title="ETF Price", side="right", overlaying="y", showgrid=False), template="plotly_white")
+            st.plotly_chart(fig_ts, width='stretch')
 
-        regime_perf = data.groupby('Regime')['r_kbe'].mean() * 100 * 252 # Annualized
-        fig_regime = px.bar(regime_perf, title="Annualized Broad Bank Returns (KBE) by Regime", labels=dict(value="Annualized Return (%)", Regime="Policy Regime"), color=regime_perf.index)
-        st.plotly_chart(fig_regime, width='stretch')
+            # 2. Sector Sensitivity Comparison
+            st.subheader("2. Sector Benchmarking: Interest Rate Betas")
+            res_kbe = run_ols_regression(data, 'r_kbe', 'd_ff')
+            res_spy = run_ols_regression(data, 'r_spy', 'd_ff')
+            col1, col2 = st.columns(2)
+            col1.metric("Bank Beta", f"{res_kbe.params['d_ff']:.4f}")
+            col2.metric("Market Beta", f"{res_spy.params['d_ff']:.4f}")
+            st.caption("Lower (more negative) Beta means the sector is more sensitive to rate hikes. Banks typically show higher sensitivity.")
 
-        # Cumulative returns during the most recent hiking cycle
-        hiking_cycle = data[data.index > '2022-01-01']
-        if not hiking_cycle.empty:
-            hiking_cycle['cum_kbe'] = (1 + hiking_cycle['r_kbe']).cumprod()
-            hiking_cycle['cum_iat'] = (1 + hiking_cycle['r_iat']).cumprod()
-            fig_cum = go.Figure()
-            fig_cum.add_trace(go.Scatter(x=hiking_cycle.index, y=hiking_cycle['cum_kbe'], name='Broad Banks (KBE)'))
-            fig_cum.add_trace(go.Scatter(x=hiking_cycle.index, y=hiking_cycle['cum_iat'], name='Regional Banks (IAT)'))
-            fig_cum.update_layout(title="Bank Performance during 2022-2024 Hike Cycle", xaxis_title="Date", yaxis_title="Cumulative Return", template="plotly_white")
-            st.plotly_chart(fig_cum, width='stretch')
+            # 3. Recursive Estimation
+            st.subheader("3. Advanced: Recursive Beta Evolution")
+            betas, se = calculate_recursive_ols(data, 'r_kbe', 'd_ff')
+            fig_rec = go.Figure()
+            fig_rec.add_trace(go.Scatter(x=data.index, y=betas, name="Recursive Beta", line=dict(color='#1f77b4')))
+            fig_rec.add_trace(go.Scatter(x=data.index, y=betas + 1.96*se, line_color='rgba(0,0,0,0)', showlegend=False))
+            fig_rec.add_trace(go.Scatter(x=data.index, y=betas - 1.96*se, fill='tonexty', fillcolor='rgba(31, 119, 180, 0.2)', name="95% Confidence Band"))
+            fig_rec.update_layout(title="Beta Stability Over Time", xaxis_title="Date", yaxis_title="Beta", template="plotly_white")
+            st.plotly_chart(fig_rec, width='stretch')
 
-        st.divider()
+            # 4. Heatmap
+            st.divider()
+            st.subheader("4. Correlation Heatmap")
+            corr = calculate_correlation_matrix(data[['d_ff', 'r_kbe', 'r_iat', 'r_spy']])
+            st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='Viridis', template="plotly_white"), width='stretch')
 
-        # 5. Lead/Lag (Cross-Correlation) Analysis
-        st.subheader("5. Lead/Lag (Cross-Correlation) Analysis")
-        lags, coeffs = calculate_cross_correlation(data['r_kbe'], data['d_ff'])
-        fig_lag = go.Figure(data=go.Scatter(x=lags, y=coeffs, mode='lines+markers', marker=dict(size=8, color='#1f77b4')))
-        fig_lag.add_vline(x=0, line_dash="dash", line_color="gray")
-        fig_lag.update_layout(title="Correlation: Rate Changes vs Bank Returns (Various Lags)", xaxis_title="Lag (Days)", yaxis_title="Correlation Coefficient", template="plotly_white")
-        st.plotly_chart(fig_lag, width='stretch')
-        st.caption("Lag > 0: Rate changes lead bank returns. Lag < 0: Bank returns lead rate changes.")
-
-        st.divider()
-
-        # Correlation Heatmap
-        st.subheader("Correlation Matrix: Market Proxy Interactions")
-        # Customizing labels for the heatmap
-        heatmap_data = data[['d_ff', 'r_kbe']].rename(columns={'d_ff': 'Rate Change', 'r_kbe': 'Bank Return'})
-        corr_matrix = calculate_correlation_matrix(heatmap_data)
+with tab3:
+    st.header("Risk stress Test")
+    st.markdown("""
+    This section uses **Monte Carlo Simulation** to project potential deposit volume outcomes based on 1,000 random 
+    interest rate paths starting from the current level.
+    """)
+    
+    if st.button("🚀 Run 1,000 Trial Stress Test"):
+        trials = run_monte_carlo_simulation(fed_funds_rate, market_power, base_volume, elasticity)
         
-        # Using a more professional color scale (Viridis or Plasma often fit modern dark/light UIs better than RdBu)
-        fig_heat = px.imshow(
-            corr_matrix, 
-            text_auto=".2f", 
-            color_continuous_scale='Viridis', 
-            labels=dict(color="Correlation"),
-            aspect="auto"
-        )
-        fig_heat.update_layout(template="plotly_white")
-        st.plotly_chart(fig_heat, width='stretch')
+        fig_hist = px.histogram(trials, nbins=50, title="Distribution of Projected Deposit Volume ($B)", labels={'value': 'Deposit Volume ($B)'}, color_discrete_sequence=['#2ca02c'])
+        fig_hist.update_layout(template="plotly_white", showlegend=False)
+        st.plotly_chart(fig_hist, width='stretch')
         
-        st.divider()
+        # Risk Metrics
+        var_95 = np.percentile(trials, 5)
+        expected = np.mean(trials)
+        contraction = (base_volume - var_95) / base_volume * 100
         
-        # 1. Stationarity Tests
-        st.subheader("1. Stationarity Analysis (ADF Test)")
-        p_ff = check_stationarity(merged['FF_Proxy'])
-        p_kbe = check_stationarity(merged['KBE'])
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Current Volume", f"${base_volume:,.0f}B")
+        col2.metric("95% VaR Volume", f"${var_95:,.0f}B")
+        col3.metric("Max Potential Drain", f"{contraction:.1f}%", delta="-Risk Exposure", delta_color="inverse")
         
-        col1, col2 = st.columns(2)
-        col1.write(f"**FF Proxy ADF p-value:** {p_ff:.4f}")
-        col2.write(f"**Bank ETF ADF p-value:** {p_kbe:.4f}")
-        if p_ff > 0.05 or p_kbe > 0.05:
-            st.warning("Series are non-stationary. We must use differences/returns for regression to avoid spurious results.")
-
-        st.divider()
-
-        # 2. Regression
-        st.subheader("2. Regression: Regional vs. Broad Banks")
-        res_kbe = run_ols_regression(data, 'r_kbe', 'd_ff')
-        res_iat = run_ols_regression(data, 'r_iat', 'd_ff')
-        
-        st.markdown(rf"""
-        Comparing how sensitive different bank types are to interest rate changes.
-        - **Broad Banks (KBE) $\beta$:** `{res_kbe.params['d_ff']:.4f}` (p-val: `{res_kbe.pvalues['d_ff']:.4f}`)
-        - **Regional Banks (IAT) $\beta$:** `{res_iat.params['d_ff']:.4f}` (p-val: `{res_iat.pvalues['d_ff']:.4f}`)
-        """)
-        
-        with st.expander("Show Regression Summaries"):
-            st.text("Broad Banks (KBE):")
-            st.text(res_kbe.summary())
-            st.text("---")
-            st.text("Regional Banks (IAT):")
-            st.text(res_iat.summary())
-            
-        fig_ols = go.Figure()
-        fig_ols.add_trace(go.Scatter(x=data['d_ff'], y=data['r_kbe'], mode='markers', name='KBE Data', marker=dict(color='rgba(31, 119, 180, 0.3)')))
-        fig_ols.add_trace(go.Scatter(x=data['d_ff'], y=data['r_iat'], mode='markers', name='IAT Data', marker=dict(color='rgba(255, 127, 14, 0.3)')))
-        
-        x_range = np.linspace(data['d_ff'].min(), data['d_ff'].max(), 100)
-        y_kbe = res_kbe.params['const'] + res_kbe.params['d_ff'] * x_range
-        y_iat = res_iat.params['const'] + res_iat.params['d_ff'] * x_range
-        
-        fig_ols.add_trace(go.Scatter(x=x_range, y=y_kbe, mode='lines', name='KBE Fit', line=dict(color='#1f77b4', width=3)))
-        fig_ols.add_trace(go.Scatter(x=x_range, y=y_iat, mode='lines', name='IAT Fit', line=dict(color='#ff7f0e', width=3)))
-        
-        fig_ols.update_layout(title=r"Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title=r"$\Delta$ Rate (%)", yaxis_title="Return", template="plotly_white")
-        st.plotly_chart(fig_ols, width='stretch')
-
-        st.divider()
-
-        # 3. Rolling Beta
-        st.subheader("3. Rolling Interest Rate Sensitivity")
-        window = st.slider("Rolling Window (Days)", 60, 500, 252)
-        rolling_beta = calculate_rolling_beta(data, 'r_kbe', 'd_ff', window=window)
-        
-        fig_roll = go.Figure(data=go.Scatter(x=rolling_beta.index, y=rolling_beta, mode='lines', name='Beta', line=dict(color='#9467bd')))
-        fig_roll.update_layout(title=f"Rolling {window}-Day Beta (Sensitivity to Rates)", xaxis_title="Date", yaxis_title="Beta Coefficient", template="plotly_white")
-        st.plotly_chart(fig_roll, width='stretch')
-        st.info("A negative beta means the bank sector tends to underperform when rates rise, consistent with the Deposits Channel.")
-
-    else:
-        st.error("Market data unavailable. Please check your connection.")
+        st.warning(f"In 5% of simulated scenarios, the Deposits Channel causes a drain of more than ${base_volume - var_95:,.0f}B.")
 
 st.divider()
-with st.expander("Academic Deep Dive: Equations & Results from DSS (2017)"):
+with st.expander("Reference: Drechsler, Savov & Schnabl (2017)"):
     st.latex(r"Spread_i = f - r^d_i = \alpha_i + \beta_i f + \epsilon_i")
     st.markdown("""
-    **Core Findings from the Paper:**
-    1. **Deposit Betas:** Banks pass through only a fraction of rate hikes to depositors.
-    2. **Smoking Gun:** This effect is significantly stronger in zip codes with high bank concentration (HHI).
-    3. **Lending Impact:** A 100bp hike leads to a roughly 0.5% drop in total bank assets via this channel.
+    The "Smoking Gun" evidence in the paper shows that the coefficient $\beta_i$ is significantly larger in markets 
+    with high HHI (bank concentration). This dashboard allows you to stress test that assumption.
     """)
