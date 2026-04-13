@@ -48,6 +48,37 @@ def calculate_correlation_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """Returns the correlation matrix of a dataframe."""
     return df.corr()
 
+def calculate_recursive_ols(df: pd.DataFrame, y_col: str, x_col: str):
+    """Calculates recursive OLS coefficients and standard errors."""
+    y = df[y_col]
+    x = sm.add_constant(df[x_col])
+    from statsmodels.regression.recursive_ls import RecursiveLS
+    res = RecursiveLS(y, x).fit()
+    # statsmodels RecursiveLSResults.recursive_coefficients has 'params' attribute in some versions
+    # but more reliably we can use res.filtered_state
+    # filtered_state is (k_vars, nobs)
+    betas = res.filtered_state[1]
+    # standard errors from filtered_state_cov diagonal
+    se = np.sqrt(res.filtered_state_cov[1, 1, :])
+    return pd.Series(betas, index=df.index), pd.Series(se, index=df.index)
+
+def run_monte_carlo_simulation(current_rate: float, market_power: float, base_volume: float, elasticity: float, trials: int = 1000):
+    """Simulates random rate paths and resulting volume contractions."""
+    # Assuming daily volatility of 5bps for rate shocks
+    vol = 0.0005
+    results = []
+    np.random.seed(42)
+    for _ in range(trials):
+        # 1-year random walk (approx 252 days)
+        shocks = np.random.normal(0, vol, 252)
+        final_rate = max(0.0, current_rate + np.sum(shocks))
+        # Calculate resulting volume using our simulation functions
+        from simulation import calculate_deposit_rate, calculate_deposit_volume
+        dep_rate = calculate_deposit_rate(final_rate, market_power)
+        final_vol = calculate_deposit_volume(base_volume, final_rate - dep_rate, elasticity)
+        results.append(final_vol)
+    return np.array(results)
+
 def calculate_cross_correlation(s1: pd.Series, s2: pd.Series, max_lag: int = 15):
     """Calculates cross-correlation between two series at various lags."""
     lags = range(-max_lag, max_lag + 1)
