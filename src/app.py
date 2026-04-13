@@ -5,8 +5,15 @@ import plotly.graph_objects as go
 import plotly.express as px
 import statsmodels.api as sm
 from simulation import calculate_deposit_rate, calculate_deposit_volume
-from data_fetcher import get_proxy_fed_funds, get_proxy_deposits
-from analysis import run_ols_regression, check_stationarity, calculate_rolling_beta, calculate_correlation_matrix
+from data_fetcher import get_proxy_fed_funds, get_proxy_deposits, get_proxy_regional_banks
+from analysis import (
+    run_ols_regression, 
+    check_stationarity, 
+    calculate_rolling_beta, 
+    calculate_correlation_matrix,
+    calculate_cross_correlation,
+    detect_monetary_regimes
+)
 
 st.set_page_config(page_title="Deposits Channel", layout="wide")
 
@@ -124,21 +131,24 @@ else:
     with st.spinner("Fetching market data..."):
         ff_proxy = get_proxy_fed_funds()
         kbe_proxy = get_proxy_deposits()
+        iat_proxy = get_proxy_regional_banks()
 
-    if not ff_proxy.empty and not kbe_proxy.empty:
+    if not ff_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty:
         # Prepare Data
-        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe').dropna()
-        merged.columns = ['FF_Proxy', 'Bank_ETF']
+        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe')
+        merged = merged.join(iat_proxy, rsuffix='_iat').dropna()
+        merged.columns = ['FF_Proxy', 'KBE', 'IAT']
         
         # Calculate changes/returns
         merged['d_ff'] = merged['FF_Proxy'].diff()
-        merged['r_kbe'] = merged['Bank_ETF'].pct_change()
+        merged['r_kbe'] = merged['KBE'].pct_change()
+        merged['r_iat'] = merged['IAT'].pct_change()
         data = merged.dropna()
         
         # Display raw time series
         fig_ts = go.Figure()
         fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['FF_Proxy'], name="FF Proxy Yield (%)", yaxis="y1", line=dict(color='#1f77b4')))
-        fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['Bank_ETF'], name="Bank ETF Price ($)", yaxis="y2", line=dict(color='#ff7f0e')))
+        fig_ts.add_trace(go.Scatter(x=merged.index, y=merged['KBE'], name="Bank ETF Price ($)", yaxis="y2", line=dict(color='#ff7f0e')))
         fig_ts.update_layout(
             title="Time Series: Rates vs Bank Stock Price",
             yaxis=dict(title=dict(text="Yield (%)", font=dict(color="#1f77b4")), side="left", tickfont=dict(color="#1f77b4")),
@@ -148,6 +158,39 @@ else:
         )
         st.plotly_chart(fig_ts, width='stretch')
         
+        st.divider()
+
+        # 4. Monetary Policy Regime Performance
+        st.subheader("4. Monetary Policy Regime Performance")
+        regimes = detect_monetary_regimes(data['FF_Proxy'])
+        data['Regime'] = regimes
+
+        regime_perf = data.groupby('Regime')['r_kbe'].mean() * 100 * 252 # Annualized
+        fig_regime = px.bar(regime_perf, title="Annualized Broad Bank Returns (KBE) by Regime", labels=dict(value="Annualized Return (%)", Regime="Policy Regime"), color=regime_perf.index)
+        st.plotly_chart(fig_regime, width='stretch')
+
+        # Cumulative returns during the most recent hiking cycle
+        hiking_cycle = data[data.index > '2022-01-01']
+        if not hiking_cycle.empty:
+            hiking_cycle['cum_kbe'] = (1 + hiking_cycle['r_kbe']).cumprod()
+            hiking_cycle['cum_iat'] = (1 + hiking_cycle['r_iat']).cumprod()
+            fig_cum = go.Figure()
+            fig_cum.add_trace(go.Scatter(x=hiking_cycle.index, y=hiking_cycle['cum_kbe'], name='Broad Banks (KBE)'))
+            fig_cum.add_trace(go.Scatter(x=hiking_cycle.index, y=hiking_cycle['cum_iat'], name='Regional Banks (IAT)'))
+            fig_cum.update_layout(title="Bank Performance during 2022-2024 Hike Cycle", xaxis_title="Date", yaxis_title="Cumulative Return", template="plotly_white")
+            st.plotly_chart(fig_cum, width='stretch')
+
+        st.divider()
+
+        # 5. Lead/Lag (Cross-Correlation) Analysis
+        st.subheader("5. Lead/Lag (Cross-Correlation) Analysis")
+        lags, coeffs = calculate_cross_correlation(data['r_kbe'], data['d_ff'])
+        fig_lag = go.Figure(data=go.Scatter(x=lags, y=coeffs, mode='lines+markers', marker=dict(size=8, color='#1f77b4')))
+        fig_lag.add_vline(x=0, line_dash="dash", line_color="gray")
+        fig_lag.update_layout(title="Correlation: Rate Changes vs Bank Returns (Various Lags)", xaxis_title="Lag (Days)", yaxis_title="Correlation Coefficient", template="plotly_white")
+        st.plotly_chart(fig_lag, width='stretch')
+        st.caption("Lag > 0: Rate changes lead bank returns. Lag < 0: Bank returns lead rate changes.")
+
         st.divider()
 
         # Correlation Heatmap
@@ -172,7 +215,7 @@ else:
         # 1. Stationarity Tests
         st.subheader("1. Stationarity Analysis (ADF Test)")
         p_ff = check_stationarity(merged['FF_Proxy'])
-        p_kbe = check_stationarity(merged['Bank_ETF'])
+        p_kbe = check_stationarity(merged['KBE'])
         
         col1, col2 = st.columns(2)
         col1.write(f"**FF Proxy ADF p-value:** {p_ff:.4f}")
@@ -183,26 +226,35 @@ else:
         st.divider()
 
         # 2. Regression
-        st.subheader("2. Regression: Bank Performance vs Rate Changes")
-        res = run_ols_regression(data, 'r_kbe', 'd_ff')
+        st.subheader("2. Regression: Regional vs. Broad Banks")
+        res_kbe = run_ols_regression(data, 'r_kbe', 'd_ff')
+        res_iat = run_ols_regression(data, 'r_iat', 'd_ff')
         
         st.markdown(rf"""
-        **Hypothesis:** If the Deposits Channel is active, rate hikes ($\Delta f$) should correlate with lower bank performance.
-        - **Coefficient ($\beta$):** `{res.params['d_ff']:.4f}`
-        - **P-Value:** `{res.pvalues['d_ff']:.4f}`
-        - **R-Squared:** `{res.rsquared:.4f}`
+        Comparing how sensitive different bank types are to interest rate changes.
+        - **Broad Banks (KBE) $\beta$:** `{res_kbe.params['d_ff']:.4f}` (p-val: `{res_kbe.pvalues['d_ff']:.4f}`)
+        - **Regional Banks (IAT) $\beta$:** `{res_iat.params['d_ff']:.4f}` (p-val: `{res_iat.pvalues['d_ff']:.4f}`)
         """)
         
-        with st.expander("Show Full Regression Summary"):
-            st.text(res.summary())
+        with st.expander("Show Regression Summaries"):
+            st.text("Broad Banks (KBE):")
+            st.text(res_kbe.summary())
+            st.text("---")
+            st.text("Regional Banks (IAT):")
+            st.text(res_iat.summary())
             
         fig_ols = go.Figure()
-        fig_ols.add_trace(go.Scatter(x=data['d_ff'], y=data['r_kbe'], mode='markers', name='Actual Data', marker=dict(color='rgba(31, 119, 180, 0.5)')))
-        # Generate fit line
+        fig_ols.add_trace(go.Scatter(x=data['d_ff'], y=data['r_kbe'], mode='markers', name='KBE Data', marker=dict(color='rgba(31, 119, 180, 0.3)')))
+        fig_ols.add_trace(go.Scatter(x=data['d_ff'], y=data['r_iat'], mode='markers', name='IAT Data', marker=dict(color='rgba(255, 127, 14, 0.3)')))
+        
         x_range = np.linspace(data['d_ff'].min(), data['d_ff'].max(), 100)
-        y_fit = res.params['const'] + res.params['d_ff'] * x_range
-        fig_ols.add_trace(go.Scatter(x=x_range, y=y_fit, mode='lines', name='Linear Fit', line=dict(color='#d62728', width=2)))
-        fig_ols.update_layout(title=r"Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title=r"$\Delta$ Rate (%)", yaxis_title="Bank ETF Return", template="plotly_white")
+        y_kbe = res_kbe.params['const'] + res_kbe.params['d_ff'] * x_range
+        y_iat = res_iat.params['const'] + res_iat.params['d_ff'] * x_range
+        
+        fig_ols.add_trace(go.Scatter(x=x_range, y=y_kbe, mode='lines', name='KBE Fit', line=dict(color='#1f77b4', width=3)))
+        fig_ols.add_trace(go.Scatter(x=x_range, y=y_iat, mode='lines', name='IAT Fit', line=dict(color='#ff7f0e', width=3)))
+        
+        fig_ols.update_layout(title=r"Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title=r"$\Delta$ Rate (%)", yaxis_title="Return", template="plotly_white")
         st.plotly_chart(fig_ols, width='stretch')
 
         st.divider()
