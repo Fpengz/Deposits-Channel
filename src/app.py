@@ -29,7 +29,7 @@ if mode == "Theory & Simulation":
     # However, st.markdown with a mermaid block is supported in modern Streamlit.
     # Let's use a more robust layout.
     
-    st.markdown("""
+    st.markdown(r"""
     ### 1. Fed Funds Rate ↑  $\longrightarrow$  2. Deposit Spread ↑  $\longrightarrow$  3. Deposit Outflow  $\longrightarrow$  4. Bank Lending ↓
     """)
     
@@ -76,6 +76,27 @@ if mode == "Theory & Simulation":
         template="plotly_white"
     )
     st.plotly_chart(fig, width='stretch')
+
+    st.divider()
+    st.subheader("Interactive Heatmap: Deposit Spreads")
+    st.markdown("This heatmap shows the **Deposit Spread** (Fed Rate - Deposit Rate) across different levels of market power and interest rates.")
+
+    # Grid for heatmap
+    ff_range = np.linspace(0, 0.1, 20)
+    mp_range = np.linspace(0, 1.0, 20)
+    # Spread = f - f*(1-mp) = f*mp
+    spreads = np.array([[f * mp * 100 for mp in mp_range] for f in ff_range])
+
+    fig_heat_sim = px.imshow(
+        spreads,
+        x=[f"{mp:.1f}" for mp in mp_range],
+        y=[f"{f*100:.1f}%" for f in ff_range],
+        labels=dict(x="Bank Market Power", y="Fed Funds Rate (%)", color="Spread (%)"),
+        color_continuous_scale='Viridis',
+        aspect="auto"
+    )
+    fig_heat_sim.update_layout(template="plotly_white")
+    st.plotly_chart(fig_heat_sim, width='stretch')
 
     st.divider()
     st.subheader("Concentration Analysis: How Market Power Amplifies the Channel")
@@ -165,7 +186,7 @@ else:
         st.subheader("2. Regression: Bank Performance vs Rate Changes")
         res = run_ols_regression(data, 'r_kbe', 'd_ff')
         
-        st.markdown(f"""
+        st.markdown(rf"""
         **Hypothesis:** If the Deposits Channel is active, rate hikes ($\Delta f$) should correlate with lower bank performance.
         - **Coefficient ($\beta$):** `{res.params['d_ff']:.4f}`
         - **P-Value:** `{res.pvalues['d_ff']:.4f}`
@@ -181,7 +202,7 @@ else:
         x_range = np.linspace(data['d_ff'].min(), data['d_ff'].max(), 100)
         y_fit = res.params['const'] + res.params['d_ff'] * x_range
         fig_ols.add_trace(go.Scatter(x=x_range, y=y_fit, mode='lines', name='Linear Fit', line=dict(color='#d62728', width=2)))
-        fig_ols.update_layout(title="Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title="$\Delta$ Rate (%)", yaxis_title="Bank ETF Return", template="plotly_white")
+        fig_ols.update_layout(title=r"Regression: Bank Returns vs $\Delta$ Rate Proxy", xaxis_title=r"$\Delta$ Rate (%)", yaxis_title="Bank ETF Return", template="plotly_white")
         st.plotly_chart(fig_ols, width='stretch')
 
         st.divider()
