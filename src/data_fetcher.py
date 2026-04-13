@@ -5,25 +5,46 @@ from datetime import datetime, timedelta
 def fetch_market_data(ticker: str, period: str = "5y") -> pd.DataFrame:
     """
     Fetches market data from Yahoo Finance as a fallback for FRED.
-    Common tickers:
-    - '^IRX': 13 Week Treasury Bill (Yield)
-    - '^FVX': 5 Year Treasury Note (Yield)
-    - '^TNX': 10 Year Treasury Note (Yield)
-    - 'XLB': Materials Select Sector SPDR Fund (Proxy for bank assets/deposits)
     """
     try:
-        data = yf.download(ticker, period=period)
+        # download with auto_adjust=False to try and get Adj Close
+        # But handle the MultiIndex that yfinance often returns now
+        data = yf.download(ticker, period=period, auto_adjust=False)
+        
         if data.empty:
+            print(f"Warning: No data returned for ticker {ticker}")
             return pd.DataFrame()
         
-        # yfinance returns multiple columns (Open, High, Low, Close, Adj Close, Volume)
-        # We'll use 'Adj Close' as our 'value'
-        df = data[['Adj Close']].copy()
+        # yfinance >= 0.2.x often returns MultiIndex columns even for single tickers
+        # Flatten MultiIndex if it exists
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
+            
+        # Try to use Adj Close, fall back to Close
+        target_col = None
+        if 'Adj Close' in data.columns:
+            target_col = 'Adj Close'
+        elif 'Close' in data.columns:
+            target_col = 'Close'
+            
+        if target_col is None:
+            print(f"Error: Neither 'Adj Close' nor 'Close' found in columns: {data.columns}")
+            return pd.DataFrame()
+            
+        df = data[[target_col]].copy()
         df.columns = ['value']
         df.index.name = 'date'
+        
+        # Handle cases where value might be all NaN
+        if df['value'].isnull().all():
+            print(f"Warning: All values for {ticker} are NaN")
+            return pd.DataFrame()
+            
         return df
     except Exception as e:
-        print(f"Error fetching data for {ticker}: {e}")
+        print(f"Exception fetching data for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return pd.DataFrame()
 
 def get_proxy_fed_funds() -> pd.DataFrame:
