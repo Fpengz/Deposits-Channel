@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 import statsmodels.api as sm
 from simulation import calculate_deposit_rate, calculate_deposit_volume
 from data_fetcher import get_proxy_fed_funds, get_proxy_deposits
-from analysis import run_ols_regression, check_stationarity, calculate_rolling_beta
+from analysis import run_ols_regression, check_stationarity, calculate_rolling_beta, calculate_correlation_matrix
 
 st.set_page_config(page_title="Deposits Channel", layout="wide")
 
@@ -20,6 +21,32 @@ mode = st.sidebar.radio("Select View", ["Theory & Simulation", "Empirical Analys
 
 if mode == "Theory & Simulation":
     st.header("Theoretical Model")
+    
+    st.subheader("The Mechanism: From Rates to Lending")
+    st.markdown("""
+    ```mermaid
+    graph TD
+        Fed[Fed Funds Rate ↑] --> Spread[Deposit Spread ↑]
+        Power[Bank Market Power] --> Spread
+        Spread --> Outflow[Deposit Outflow]
+        Outflow --> Lending[Bank Lending ↓]
+        style Fed fill:#f96,stroke:#333
+        style Lending fill:#69f,stroke:#333
+    ```
+    """, unsafe_allow_html=True)
+    
+    colA, colB, colC = st.columns(3)
+    with colA:
+        st.markdown("**1. Market Power**")
+        st.caption("Banks in concentrated markets (high HHI) can keep deposit rates low even when the Fed hikes.")
+    with colB:
+        st.markdown("**2. The Spread**")
+        st.caption("The 'price of liquidity' widens as banks widen the gap between what they earn and what they pay you.")
+    with colC:
+        st.markdown("**3. Transmission**")
+        st.caption("As deposits flow to Money Market Funds, banks lose their cheapest source of funding and must cut lending.")
+
+    st.divider()
     st.markdown("Use the sliders to see how Fed Rate hikes transmit through sticky deposits.")
     
     # Sidebar for simulation controls
@@ -54,6 +81,21 @@ if mode == "Theory & Simulation":
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    st.divider()
+    st.subheader("Concentration Analysis: How Market Power Amplifies the Channel")
+
+    # Compare High HHI vs Low HHI
+    rates_hhi = [r/100.0 for r in range(0, 1001, 25)]
+    vol_high = [calculate_deposit_volume(10000, r - calculate_deposit_rate(r, 0.8), 10) for r in rates_hhi]
+    vol_low = [calculate_deposit_volume(10000, r - calculate_deposit_rate(r, 0.2), 10) for r in rates_hhi]
+
+    fig_hhi = go.Figure()
+    fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_high, name="High Concentration (HHI=0.8)"))
+    fig_hhi.add_trace(go.Scatter(x=[r*100 for r in rates_hhi], y=vol_low, name="Low Concentration (HHI=0.2)"))
+    fig_hhi.update_layout(title="HHI Impact: Deposit Supply Curve", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)")
+    st.plotly_chart(fig_hhi, use_container_width=True)
+    st.info("The Deposits Channel is more potent in concentrated markets. Higher HHI = Steeper deposit supply curve.")
+
 else:
     st.header("Empirical Analysis")
     st.markdown("""
@@ -87,6 +129,14 @@ else:
             hovermode="x unified"
         )
         st.plotly_chart(fig_ts, use_container_width=True)
+        
+        st.divider()
+
+        # Correlation Heatmap
+        st.subheader("Correlation Matrix: Market Proxy Interactions")
+        corr_matrix = calculate_correlation_matrix(data[['d_ff', 'r_kbe']])
+        fig_heat = px.imshow(corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', labels=dict(color="Correlation"))
+        st.plotly_chart(fig_heat, use_container_width=True)
         
         st.divider()
         
@@ -140,3 +190,13 @@ else:
 
     else:
         st.error("Market data unavailable. Please check your connection.")
+
+st.divider()
+with st.expander("Academic Deep Dive: Equations & Results from DSS (2017)"):
+    st.latex(r"Spread_i = f - r^d_i = \alpha_i + \beta_i f + \epsilon_i")
+    st.markdown("""
+    **Core Findings from the Paper:**
+    1. **Deposit Betas:** Banks pass through only a fraction of rate hikes to depositors.
+    2. **Smoking Gun:** This effect is significantly stronger in zip codes with high bank concentration (HHI).
+    3. **Lending Impact:** A 100bp hike leads to a roughly 0.5% drop in total bank assets via this channel.
+    """)
