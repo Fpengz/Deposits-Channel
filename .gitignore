@@ -25,3 +25,10 @@
 
 # macOS
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Brainstorming artifacts
+.superpowers/

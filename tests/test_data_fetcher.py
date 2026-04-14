@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from unittest.mock import patch
 import numpy as np
-from src.data_fetcher import fetch_market_data, get_proxy_fed_funds, get_proxy_deposits
+from src.data_fetcher import fetch_market_data, get_proxy_fed_funds, get_proxy_deposits, get_proxy_volatility
 
 @patch('src.data_fetcher.yf.download')
 def test_fetch_market_data(mock_download):
@@ -24,7 +24,9 @@ def test_get_proxies(mock_fetch):
     
     df_ff = get_proxy_fed_funds()
     df_dep = get_proxy_deposits()
+    df_vix = get_proxy_volatility()
     
     assert not df_ff.empty
     assert not df_dep.empty
-    assert mock_fetch.call_count == 2
+    assert not df_vix.empty
+    assert mock_fetch.call_count == 3
