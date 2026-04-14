@@ -75,3 +75,7 @@ def get_proxy_10y_yield() -> pd.DataFrame:
 def get_proxy_credit_ig() -> pd.DataFrame:
     """Returns iShares Investment Grade Corporate Bond ETF (LQD)."""
     return fetch_market_data('LQD')
+
+def get_proxy_volatility() -> pd.DataFrame:
+    """Returns the CBOE Volatility Index (^VIX)."""
+    return fetch_market_data('^VIX')

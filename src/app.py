@@ -76,30 +76,69 @@ with tab1:
     dep_rate = calculate_deposit_rate(fed_funds_rate, market_power)
     spread = fed_funds_rate - dep_rate
     volume = calculate_deposit_volume(base_volume, spread, elasticity)
+    
+    # AOCI Calculation
+    from analysis import calculate_bond_portfolio_loss
+    bond_loss = calculate_bond_portfolio_loss(base_volume, fed_funds_rate, duration=5.0)
+    liquidity_proxy = (volume + bond_loss) / base_volume * 100
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Fed Funds Rate", f"{fed_funds_rate*100:.2f}%")
     col2.metric("Deposit Rate", f"{dep_rate*100:.2f}%", f"-{spread*100:.2f}% spread")
     col3.metric("Total Deposits", f"${volume:,.0f}B")
+    col4.metric("Capital Buffer (Proxy)", f"{liquidity_proxy:.1f}%", f"${bond_loss:,.0f}B Unrealized Loss", delta_color="inverse")
 
-    # Static plot for simulation
-    rates = [r/100.0 for r in range(0, 1000, 25)]
-    volumes = [calculate_deposit_volume(base_volume, r - calculate_deposit_rate(r, market_power), elasticity) for r in rates]
+    st.info("The **Capital Buffer Proxy** shows the dual squeeze: Deposit outflows + bond portfolio losses (AOCI).")
 
-    fig = go.Figure(data=go.Scatter(x=[r*100 for r in rates], y=volumes, mode='lines', name='Theoretical Volume', line=dict(color='#1f77b4', width=3)))
-    fig.add_vline(x=fed_funds_rate*100, line_dash="dash", line_color="#ff7f0e")
-    fig.add_annotation(x=fed_funds_rate*100, text="Current Rate", showarrow=False, y=1, yref="paper", textangle=-90, yanchor="bottom")
-    fig.update_layout(title="Theoretical Deposit Volume vs Fed Funds Rate", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
-    st.plotly_chart(fig, width='stretch')
+    # Sub-tabs within Theory
+    theory_tab1, theory_tab2 = st.tabs(["Mechanism Simulation", "Synthetic Cross-Section"])
+    
+    with theory_tab1:
+        # Static plot for simulation
+        rates = [r/100.0 for r in range(0, 1000, 25)]
+        volumes = [calculate_deposit_volume(base_volume, r - calculate_deposit_rate(r, market_power), elasticity) for r in rates]
 
-    st.divider()
-    st.subheader("Interactive Heatmap: Deposit Spreads")
-    ff_range = np.linspace(0, 0.1, 20)
-    mp_range = np.linspace(0, 1.0, 20)
-    spreads = np.array([[f * mp * 100 for mp in mp_range] for f in ff_range])
-    fig_heat_sim = px.imshow(spreads, x=[f"{mp:.1f}" for mp in mp_range], y=[f"{f*100:.1f}%" for f in ff_range], labels=dict(x="Bank Market Power", y="Fed Funds Rate (%)", color="Spread (%)"), color_continuous_scale='Viridis', aspect="auto")
-    fig_heat_sim.update_layout(template="plotly_white")
-    st.plotly_chart(fig_heat_sim, width='stretch')
+        fig = go.Figure(data=go.Scatter(x=[r*100 for r in rates], y=volumes, mode='lines', name='Theoretical Volume', line=dict(color='#1f77b4', width=3)))
+        fig.add_vline(x=fed_funds_rate*100, line_dash="dash", line_color="#ff7f0e")
+        fig.add_annotation(x=fed_funds_rate*100, text="Current Rate", showarrow=False, y=1, yref="paper", textangle=-90, yanchor="bottom")
+        fig.update_layout(title="Theoretical Deposit Volume vs Fed Funds Rate", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Volume ($B)", template="plotly_white")
+        st.plotly_chart(fig, width='stretch')
+
+        st.divider()
+        st.subheader("Interactive Heatmap: Deposit Spreads")
+        ff_range = np.linspace(0, 0.1, 20)
+        mp_range = np.linspace(0, 1.0, 20)
+        spreads = np.array([[f * mp * 100 for mp in mp_range] for f in ff_range])
+        fig_heat_sim = px.imshow(spreads, x=[f"{mp:.1f}" for mp in mp_range], y=[f"{f*100:.1f}%" for f in ff_range], labels=dict(x="Bank Market Power", y="Fed Funds Rate (%)", color="Spread (%)"), color_continuous_scale='Viridis', aspect="auto")
+        fig_heat_sim.update_layout(template="plotly_white")
+        st.plotly_chart(fig_heat_sim, width='stretch')
+
+    with theory_tab2:
+        st.subheader("Synthetic HHI Cohorts: Monopolist vs Competitor")
+        st.markdown("Replicating zip-code level heterogeneity using paper coefficients.")
+        
+        # High HHI vs Low HHI
+        # DSS (2017) result: High HHI areas have much higher deposit betas
+        hhi_high = 0.8
+        hhi_low = 0.2
+        
+        rates_syn = np.linspace(0, 0.08, 50)
+        # Using the model: deposit_rate = f * (1 - HHI)
+        dr_high = rates_syn * (1 - hhi_high)
+        dr_low = rates_syn * (1 - hhi_low)
+        
+        fig_syn = go.Figure()
+        fig_syn.add_trace(go.Scatter(x=rates_syn*100, y=dr_high*100, name="Concentrated Bank (HHI=0.8)", line=dict(dash='dot')))
+        fig_syn.add_trace(go.Scatter(x=rates_syn*100, y=dr_low*100, name="Competitive Bank (HHI=0.2)"))
+        fig_syn.add_trace(go.Scatter(x=rates_syn*100, y=rates_syn*100, name="Fed Funds (Full Pass-through)", line=dict(color='black', dash='dash')))
+        fig_syn.update_layout(title="Synthetic Deposit Rates vs Fed Funds", xaxis_title="Fed Funds Rate (%)", yaxis_title="Deposit Rate (%)", template="plotly_white")
+        st.plotly_chart(fig_syn, width='stretch')
+        
+        st.markdown("""
+        **Observations:**
+        - **The Monopolist:** Widens the spread aggressively as Fed hikes, maximizing profit at the cost of deposit volume.
+        - **The Competitor:** Forced to pass through most of the rate hike to keep depositors, protecting volume but squeezing margin.
+        """)
 
 with tab2:
     st.header("Empirical Terminal")
@@ -109,11 +148,12 @@ with tab2:
         kbe_proxy = get_proxy_deposits()
         iat_proxy = get_proxy_regional_banks()
         spy_proxy = get_proxy_market()
+        vix_proxy = get_proxy_volatility()
 
-    if not ff_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty and not spy_proxy.empty:
+    if not ff_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty and not spy_proxy.empty and not vix_proxy.empty:
         # Merge and Filter
-        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe').join(iat_proxy, rsuffix='_iat').join(spy_proxy, rsuffix='_spy').dropna()
-        merged.columns = ['FF_Proxy', 'KBE', 'IAT', 'SPY']
+        merged = ff_proxy.join(kbe_proxy, lsuffix='_ff', rsuffix='_kbe').join(iat_proxy, rsuffix='_iat').join(spy_proxy, rsuffix='_spy').join(vix_proxy, rsuffix='_vix').dropna()
+        merged.columns = ['FF_Proxy', 'KBE', 'IAT', 'SPY', 'VIX']
         data_full = merged[(merged.index >= pd.to_datetime(start_date)) & (merged.index <= pd.to_datetime(end_date))]
         
         if data_full.empty:
@@ -160,10 +200,39 @@ with tab2:
             fig_rec.update_layout(title="Beta Stability Over Time", xaxis_title="Date", yaxis_title="Beta", template="plotly_white")
             st.plotly_chart(fig_rec, width='stretch')
 
-            # 4. Heatmap
+            # 4. Advanced: Crisis-Conditional Sensitivity (VIX)
+            st.subheader("4. Advanced: Crisis-Conditional Sensitivity (VIX)")
+            st.markdown("Does the Deposits Channel amplify when market fear is high?")
+            high_vix = data[data['VIX'] > 20]
+            low_vix = data[data['VIX'] <= 20]
+            
+            if not high_vix.empty and not low_vix.empty:
+                res_high = run_ols_regression(high_vix, 'r_kbe', 'd_ff')
+                res_low = run_ols_regression(low_vix, 'r_kbe', 'd_ff')
+                
+                col1, col2 = st.columns(2)
+                col1.metric("Beta (VIX > 20)", f"{res_high.params['d_ff']:.4f}")
+                col2.metric("Beta (VIX <= 20)", f"{res_low.params['d_ff']:.4f}")
+                st.caption("A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress.")
+
+            # 5. Dynamic Analysis: Impulse Response Functions
+            st.subheader("5. Dynamic Analysis: The Shock Ripple (IRF)")
+            st.markdown("If the Fed hikes rates by 100bp today, how do bank valuations respond over the next 20 days?")
+            from analysis import calculate_irf
+            irf_kbe = calculate_irf(data, 'r_kbe', 'd_ff', periods=20)
+            irf_iat = calculate_irf(data, 'r_iat', 'd_ff', periods=20)
+            
+            fig_irf = go.Figure()
+            fig_irf.add_trace(go.Scatter(x=list(range(21)), y=irf_kbe, name="Response of Broad Banks (KBE)"))
+            fig_irf.add_trace(go.Scatter(x=list(range(21)), y=irf_iat, name="Response of Regional Banks (IAT)", line=dict(color='red')))
+            fig_irf.add_hline(y=0, line_dash="dash", line_color="gray")
+            fig_irf.update_layout(title="Impulse Response to 1-Unit Rate Shock", xaxis_title="Days since Shock", yaxis_title="Response (Returns)", template="plotly_white")
+            st.plotly_chart(fig_irf, width='stretch')
+
+            # 6. Heatmap
             st.divider()
-            st.subheader("4. Correlation Heatmap")
-            corr = calculate_correlation_matrix(data[['d_ff', 'r_kbe', 'r_iat', 'r_spy']])
+            st.subheader("6. Correlation Heatmap")
+            corr = calculate_correlation_matrix(data[['d_ff', 'r_kbe', 'r_iat', 'r_spy', 'VIX']])
             st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='Viridis', template="plotly_white"), width='stretch')
 
 with tab3:

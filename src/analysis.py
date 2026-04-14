@@ -48,6 +48,32 @@ def calculate_correlation_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """Returns the correlation matrix of a dataframe."""
     return df.corr()
 
+def calculate_irf(df: pd.DataFrame, response_col: str, shock_col: str, periods: int = 20):
+    """Calculates IRF for a response column given a shock in shock_col."""
+    data = df[[shock_col, response_col]].dropna()
+    from statsmodels.tsa.api import VAR
+    # Ensure some variation
+    if data[shock_col].std() == 0 or data[response_col].std() == 0:
+        return np.zeros(periods + 1)
+    
+    model = VAR(data)
+    try:
+        results = model.fit(maxlags=min(15, len(data)//10), ic='aic')
+        irf = results.irf(periods)
+        # Get the specific response of response_col to shock_col
+        # results.irf returns (periods+1, k, k)
+        idx_shock = 0 # shock_col is first
+        idx_resp = 1  # response_col is second
+        return irf.orth_irfs[:, idx_resp, idx_shock]
+    except:
+        return np.zeros(periods + 1)
+
+def calculate_bond_portfolio_loss(base_value: float, rate_change: float, duration: float = 5.0) -> float:
+    """Calculates market value loss based on duration risk."""
+    # Simplified duration math: dV = -D * dy * V
+    loss = -duration * rate_change * base_value
+    return loss
+
 def calculate_recursive_ols(df: pd.DataFrame, y_col: str, x_col: str):
     """Calculates recursive OLS coefficients and standard errors."""
     y = df[y_col]
