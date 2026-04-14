@@ -32,3 +32,6 @@ __pycache__/
 
 # Brainstorming artifacts
 .superpowers/
+
+# Worktrees
+.worktrees/
