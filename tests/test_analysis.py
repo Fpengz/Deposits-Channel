@@ -1,48 +1,55 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 from src.analysis import (
-    run_ols_regression, 
-    check_stationarity, 
-    calculate_rolling_beta, 
-    estimate_var_forecast,
+    build_beta_heatmap,
+    build_stress_index,
+    calculate_bond_portfolio_loss,
     calculate_correlation_matrix,
     calculate_cross_correlation,
-    detect_monetary_regimes,
-    calculate_recursive_ols,
-    run_monte_carlo_simulation,
-    calculate_irf,
-    calculate_bond_portfolio_loss,
-    calculate_liquidity_proxy,
-    calculate_returns,
     calculate_drawdown,
+    calculate_irf,
+    calculate_liquidity_proxy,
+    calculate_recursive_ols,
+    calculate_returns,
+    calculate_rolling_beta,
+    check_stationarity,
+    detect_monetary_regimes,
+    estimate_var_forecast,
+    event_study_car,
     rolling_zscore,
-    build_stress_index,
-    event_study_car
+    run_monte_carlo_simulation,
+    run_ols_regression,
 )
+
 ...
+
+
 def test_calculate_recursive_ols():
     x = np.linspace(0, 10, 100)
     y = 2 * x + np.random.normal(0, 0.1, 100)
-    df = pd.DataFrame({'y': y, 'x': x})
-    betas, se = calculate_recursive_ols(df, 'y', 'x')
+    df = pd.DataFrame({"y": y, "x": x})
+    betas, se = calculate_recursive_ols(df, "y", "x")
     assert len(betas) == 100
     assert betas.iloc[-1] == pytest.approx(2, rel=0.1)
+
 
 def test_run_monte_carlo_simulation():
     res = run_monte_carlo_simulation(0.05, 0.5, 10000, 10, trials=100)
     assert len(res) == 100
     assert np.all(res >= 0)
 
+
 def test_run_ols_regression():
     # Generate dummy data
     x = np.linspace(0, 10, 100)
     y = 2 * x + np.random.normal(0, 1, 100)
-    df = pd.DataFrame({'y': y, 'x': x})
-    
-    results = run_ols_regression(df, 'y', 'x')
-    assert results.params['x'] == pytest.approx(2, rel=0.1)
+    df = pd.DataFrame({"y": y, "x": x})
+
+    results = run_ols_regression(df, "y", "x")
+    assert results.params["x"] == pytest.approx(2, rel=0.1)
     assert results.rsquared > 0.8
+
 
 def test_check_stationarity():
     # Linear trend is non-stationary
@@ -52,16 +59,18 @@ def test_check_stationarity():
     p_value = check_stationarity(pd.Series(series))
     assert p_value > 0.05
 
+
 def test_calculate_rolling_beta():
     # Dummy returns
     np.random.seed(42)
     x = np.random.normal(0.001, 0.02, 500)
     y = 0.5 * x + np.random.normal(0, 0.005, 500)
-    df = pd.DataFrame({'y': y, 'x': x})
-    
-    rolling = calculate_rolling_beta(df, 'y', 'x', window=100)
+    df = pd.DataFrame({"y": y, "x": x})
+
+    rolling = calculate_rolling_beta(df, "y", "x", window=100)
     assert len(rolling) == 500
     assert rolling.iloc[-1] == pytest.approx(0.5, rel=0.2)
+
 
 def test_estimate_var_forecast():
     # Generate 2 correlated AR(1) processes
@@ -70,24 +79,27 @@ def test_estimate_var_forecast():
     x = np.zeros(n)
     y = np.zeros(n)
     for t in range(1, n):
-        x[t] = 0.5 * x[t-1] + np.random.normal(0, 0.1)
-        y[t] = 0.3 * y[t-1] + 0.2 * x[t-1] + np.random.normal(0, 0.1)
-    
-    df = pd.DataFrame({'A': x, 'B': y})
-    
+        x[t] = 0.5 * x[t - 1] + np.random.normal(0, 0.1)
+        y[t] = 0.3 * y[t - 1] + 0.2 * x[t - 1] + np.random.normal(0, 0.1)
+
+    df = pd.DataFrame({"A": x, "B": y})
+
     forecast = estimate_var_forecast(df, steps=5)
     assert forecast.shape == (5, 2)
 
+
 def test_calculate_correlation_matrix():
-    df = pd.DataFrame({'A': [1, 2, 3], 'B': [3, 2, 1]})
+    df = pd.DataFrame({"A": [1, 2, 3], "B": [3, 2, 1]})
     corr = calculate_correlation_matrix(df)
-    assert corr.loc['A', 'B'] == pytest.approx(-1.0)
+    assert corr.loc["A", "B"] == pytest.approx(-1.0)
+
 
 def test_calculate_cross_correlation():
     s1 = pd.Series([1, 2, 3, 2, 1])
     s2 = pd.Series([0, 1, 2, 3, 2])
     lags, coeffs = calculate_cross_correlation(s1, s2, max_lag=2)
     assert lags[np.argmax(coeffs)] == -1
+
 
 def test_calculate_cross_correlation_invalid_series():
     s1 = pd.Series([1, 1, 1, 1])
@@ -96,30 +108,35 @@ def test_calculate_cross_correlation_invalid_series():
     assert len(lags) == len(coeffs)
     assert np.all(np.isnan(coeffs))
 
+
 def test_detect_monetary_regimes():
     # Trending up then down
     ff = pd.Series([1.0, 1.1, 1.2, 1.3, 1.2, 1.1, 1.0])
     regimes = detect_monetary_regimes(ff, window=2)
-    assert 'Hiking' in regimes.values
-    assert 'Easing' in regimes.values
+    assert "Hiking" in regimes.values
+    assert "Easing" in regimes.values
+
 
 def test_calculate_irf_returns_none_for_constant_series():
-    df = pd.DataFrame({'shock': [0.0] * 50, 'resp': [0.0] * 50})
-    irf = calculate_irf(df, 'resp', 'shock', periods=5)
+    df = pd.DataFrame({"shock": [0.0] * 50, "resp": [0.0] * 50})
+    irf = calculate_irf(df, "resp", "shock", periods=5)
     assert irf is None
+
 
 def test_calculate_irf_returns_series_for_valid_data():
     np.random.seed(0)
     shock = np.random.normal(0, 1, 200)
     resp = 0.3 * np.roll(shock, 1) + np.random.normal(0, 1, 200)
-    df = pd.DataFrame({'shock': shock, 'resp': resp})
-    irf = calculate_irf(df, 'resp', 'shock', periods=5)
+    df = pd.DataFrame({"shock": shock, "resp": resp})
+    irf = calculate_irf(df, "resp", "shock", periods=5)
     assert irf is not None
     assert len(irf) == 6
+
 
 def test_calculate_bond_portfolio_loss():
     loss = calculate_bond_portfolio_loss(base_value=1000, rate_change=0.01, duration=5.0)
     assert loss == pytest.approx(-50.0)
+
 
 def test_calculate_liquidity_proxy():
     bond_loss, liquidity_proxy = calculate_liquidity_proxy(
@@ -134,11 +151,13 @@ def test_calculate_liquidity_proxy():
     assert bond_loss == pytest.approx(-900.0)
     assert liquidity_proxy == pytest.approx((9000 - 900) / 10000 * 100)
 
+
 def test_calculate_returns():
     s = pd.Series([100.0, 110.0, 99.0])
     r = calculate_returns(s)
     assert r.iloc[1] == pytest.approx(0.10)
     assert r.iloc[2] == pytest.approx(-0.1)
+
 
 def test_calculate_drawdown():
     s = pd.Series([1.0, 1.2, 1.1, 1.3, 1.0])
@@ -147,11 +166,13 @@ def test_calculate_drawdown():
     assert dd.iloc[2] == pytest.approx((1.1 / 1.2) - 1.0)
     assert dd.iloc[3] == pytest.approx(0.0)
 
+
 def test_rolling_zscore():
     s = pd.Series([1, 2, 3, 4, 5, 6])
     z = rolling_zscore(s, window=3)
     assert np.isnan(z.iloc[1])
     assert z.iloc[-1] == pytest.approx((6 - 5) / np.std([4, 5, 6], ddof=0))
+
 
 def test_build_stress_index():
     idx = pd.date_range("2023-01-01", periods=10, freq="D")
@@ -161,6 +182,7 @@ def test_build_stress_index():
     stress = build_stress_index(d_ff, r_vix, kbe, window=5, smoothing=3)
     assert stress.index.equals(idx)
     assert not stress.dropna().empty
+
 
 def test_event_study_car():
     idx = pd.date_range("2023-01-01", periods=21, freq="D")
@@ -173,3 +195,12 @@ def test_event_study_car():
     assert car.index.min() == -5
     assert car.index.max() == 5
     assert car.loc[5, "KBE"] == pytest.approx(0.11, rel=1e-2)
+
+
+def test_build_beta_heatmap_returns_figure():
+    import plotly.graph_objects as go
+
+    idx = pd.date_range("2023-01-01", periods=3, freq="D")
+    beta_df = pd.DataFrame({"KBE": [0.1, -0.2, 0.05], "IAT": [0.0, 0.3, -0.1]}, index=idx)
+    fig = build_beta_heatmap(beta_df)
+    assert isinstance(fig, go.Figure)
