@@ -759,6 +759,42 @@ with tab3:
         )
         st.plotly_chart(fig_slope, width="stretch")
 
+        st.subheader("Q5: Which macro regime are we in?")
+        regime_matrix = pd.DataFrame(
+            [
+                ("Normal", "Positive slope", "Benign", "Routine monitoring"),
+                ("Squeeze", "Flat curve", "Rising", "Watch funding competition"),
+                ("Stress", "Inverted curve", "Elevated", "Prepare for balance-sheet pressure"),
+                (
+                    "Crisis",
+                    "Inverted + disorderly moves",
+                    "Acute",
+                    "Treat liquidity as a binding constraint",
+                ),
+            ],
+            columns=["Regime", "Curve", "Credit", "Read-through"],
+        )
+        st.markdown("**Regime Matrix**")
+        st.table(regime_matrix)
+        st.markdown("Warning rules")
+        st.markdown(
+            "- Flat curve plus weaker bank-vs-MMF relative performance signals a squeeze.\n"
+            "- Inverted curve plus widening credit stress raises the odds that deposit pressure feeds back into lending.\n"
+            "- If both conditions persist, treat the setup as a crisis-style funding regime."
+        )
+        st.markdown(
+            "What to notice: the regime turns dangerous when curve compression and credit deterioration happen together."
+        )
+        st.markdown(
+            "**Research takeaway:** The regime matrix links rates, flows, and credit into one narrative state."
+        )
+        st.markdown(
+            "**Investor takeaway:** The move from Squeeze to Stress is where bank equity downside typically accelerates."
+        )
+        st.markdown(
+            "**Policy/risk takeaway:** Crisis conditions call for tighter liquidity surveillance and faster confidence backstops."
+        )
+
 with tab3:
     st.divider()
     st.subheader("Q3: Is credit stress feeding back into banks?")

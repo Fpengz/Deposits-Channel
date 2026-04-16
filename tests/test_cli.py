@@ -53,3 +53,9 @@ def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> Non
     content = Path("src/app.py").read_text()
     assert "Selected timeframe does not have enough return/rate observations" in content
     assert "if data.empty:" in content
+
+
+def test_macro_regime_matrix_labels_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Regime Matrix" in content
+    assert "Crisis" in content
