@@ -1,6 +1,27 @@
+from __future__ import annotations
+
+import ast
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import pytest
 from src import cli
+
+APP_SOURCE = Path(__file__).resolve().parents[1] / "src" / "app.py"
+
+
+def _load_app_helper(name: str, extra_globals: dict[str, object] | None = None):
+    source = APP_SOURCE.read_text()
+    module = ast.parse(source)
+    func = next(
+        node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+    namespace: dict[str, object] = {"pd": pd, "np": np}
+    if extra_globals:
+        namespace.update(extra_globals)
+    exec(compile(ast.Module(body=[func], type_ignores=[]), str(APP_SOURCE), "exec"), namespace)
+    return namespace[name]
 
 
 def test_build_app_command() -> None:
@@ -141,3 +162,51 @@ def test_monitoring_playbook_contains_exact_planned_rules() -> None:
         "If MMFs outperform while bank betas stay negative: treat that as an active-channel warning."
         in content
     )
+
+
+def test_build_recent_stress_series_can_populate_with_short_fallback_history() -> None:
+    calls: list[tuple[int, int, int]] = []
+
+    def fake_build_stress_index(
+        d_ff: pd.Series,
+        r_vix: pd.Series,
+        kbe_price: pd.Series,
+        window: int = 252,
+        smoothing: int = 5,
+    ) -> pd.Series:
+        calls.append((len(d_ff), window, smoothing))
+        if len(d_ff) >= window + smoothing - 1:
+            return pd.Series([np.nan] * (len(d_ff) - 1) + [1.0], index=d_ff.index)
+        return pd.Series(dtype=float, index=d_ff.index)
+
+    build_recent_stress_series = _load_app_helper(
+        "_build_recent_stress_series", {"build_stress_index": fake_build_stress_index}
+    )
+    index = pd.date_range("2024-01-01", periods=30, freq="D")
+    frame = pd.DataFrame(
+        {
+            "d_ff": np.linspace(0.0, 1.0, len(index)),
+            "r_vix": np.linspace(1.0, 2.0, len(index)),
+            "KBE": np.linspace(30.0, 20.0, len(index)),
+        },
+        index=index,
+    )
+
+    result = build_recent_stress_series(frame)
+
+    assert not result.empty
+    assert result.iloc[-1] == 1.0
+    assert any(length > window for length, window, _ in calls)
+
+
+def test_recent_change_reports_actual_horizon_used_in_ui_labels() -> None:
+    recent_change = _load_app_helper("_recent_change")
+    series = pd.Series(np.linspace(100.0, 114.0, 15))
+
+    change, horizon = recent_change(series)
+    content = APP_SOURCE.read_text()
+
+    assert horizon == 15
+    assert change == pytest.approx(0.14)
+    assert 'mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"' in content
+    assert 'credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"' in content

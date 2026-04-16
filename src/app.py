@@ -85,7 +85,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 
 def _build_recent_stress_series(frame: pd.DataFrame) -> pd.Series:
     for lookback in (252, 126, 63, 21, 10, 5):
-        recent = frame.tail(lookback).copy()
+        recent = frame.tail(lookback + 4).copy()
         if len(recent) < 2:
             continue
         stress_series = build_stress_index(
@@ -117,7 +117,7 @@ def _recent_beta_regime(frame: pd.DataFrame) -> tuple[float | None, str | None]:
     return None, None
 
 
-def _recent_change(series: pd.Series) -> float:
+def _recent_change(series: pd.Series) -> tuple[float, int]:
     for lookback in (252, 126, 63, 21, 10, 5):
         recent = series.dropna().tail(lookback)
         if len(recent) < 2:
@@ -125,8 +125,8 @@ def _recent_change(series: pd.Series) -> float:
         first = recent.iloc[0]
         last = recent.iloc[-1]
         if pd.notna(first) and pd.notna(last) and first != 0:
-            return last / first - 1
-    return np.nan
+            return last / first - 1, len(recent)
+    return np.nan, 0
 
 
 with tab1:
@@ -1196,10 +1196,10 @@ with tab5:
                 (mmf_frame.index >= pd.to_datetime(start_date))
                 & (mmf_frame.index <= pd.to_datetime(end_date))
             ].copy()
-            mmf_trend = _recent_change(mmf_frame["MMF_Price"])
+            mmf_trend, mmf_horizon = _recent_change(mmf_frame["MMF_Price"])
             if not np.isnan(mmf_trend):
                 mmf_value = "Pressure building" if mmf_trend > 0 else "Pressure easing"
-                mmf_delta = f"20d={mmf_trend:+.1%}"
+                mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"
 
         credit_frame = pd.DataFrame()
         if not ff_proxy.empty and not lqd_proxy.empty:
@@ -1209,10 +1209,11 @@ with tab5:
                 (credit_frame.index >= pd.to_datetime(start_date))
                 & (credit_frame.index <= pd.to_datetime(end_date))
             ].copy()
-            credit_trend = -_recent_change(credit_frame["Credit_Price"])
+            credit_trend, credit_horizon = _recent_change(credit_frame["Credit_Price"])
+            credit_trend = -credit_trend
             if not np.isnan(credit_trend):
                 credit_value = "Stress rising" if credit_trend > 0 else "Stress easing"
-                credit_delta = f"20d={credit_trend:+.1%}"
+                credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"
 
         scorecard_col1.metric("Stress composite", stress_value, delta=stress_delta)
         scorecard_col2.metric("Bank beta regime", beta_value, delta=beta_delta)
