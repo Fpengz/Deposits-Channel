@@ -378,13 +378,16 @@ with tab2:
         if data_full.empty:
             st.warning("Selected timeframe has no data overlap.")
         else:
+            core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]
             data_full["d_ff"] = data_full["FF_Proxy"].diff()
             data_full["r_kbe"] = data_full["KBE"].pct_change()
             data_full["r_iat"] = data_full["IAT"].pct_change()
             data_full["r_spy"] = data_full["SPY"].pct_change()
-            if not mmf_proxy.empty:
-                data_full["MMF"] = mmf_proxy.reindex(data_full.index).squeeze()
-            data = data_full.dropna()
+            data = data_full[core_empirical_cols].dropna().copy()
+            data["d_ff"] = data_full.loc[data.index, "d_ff"]
+            data["r_kbe"] = data_full.loc[data.index, "r_kbe"]
+            data["r_iat"] = data_full.loc[data.index, "r_iat"]
+            data["r_spy"] = data_full.loc[data.index, "r_spy"]
 
             # Q1. Market Evolution
             st.subheader("Q1: Are banks sensitive to rate shocks?")
@@ -492,8 +495,13 @@ with tab2:
 
                 latest_bank_beta = res_kbe.params["d_ff"]
                 latest_stress = stress.dropna().iloc[-1]
-                if "MMF" in data.columns:
-                    mmf_relative_series = (data["KBE"] / data["MMF"]).dropna()
+                if not mmf_proxy.empty:
+                    signal_frame = data[["KBE"]].copy()
+                    signal_frame["MMF"] = np.asarray(mmf_proxy.reindex(data.index)).reshape(-1)
+                    mmf_relative_series = (signal_frame["KBE"] / signal_frame["MMF"]).dropna()
+                else:
+                    mmf_relative_series = pd.Series(dtype=float)
+                if not mmf_relative_series.empty:
                     mmf_relative = mmf_relative_series.iloc[-1] / mmf_relative_series.iloc[0] - 1
                 else:
                     mmf_relative = np.nan

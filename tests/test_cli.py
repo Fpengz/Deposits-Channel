@@ -35,3 +35,9 @@ def test_empirical_terminal_signal_board_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Signal Board" in content
     assert "Dormant" in content
+
+
+def test_empirical_terminal_keeps_mmf_out_of_core_dropna_path() -> None:
+    content = Path("src/app.py").read_text()
+    assert 'core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]' in content
+    assert "data = data_full[core_empirical_cols].dropna().copy()" in content
