@@ -125,6 +125,24 @@ def test_classify_curve_regime():
     assert regimes.tolist() == ["Normal", "Flat", "Inverted"]
 
 
+def test_classify_curve_regime_handles_missing_data():
+    slope = pd.Series([1.2, np.nan, -0.3], index=["a", "b", "c"])
+    regimes = classify_curve_regime(slope)
+    assert regimes.tolist() == ["Normal", "Insufficient data", "Inverted"]
+
+
+def test_classify_curve_regime_threshold_boundaries():
+    slope = pd.Series([0.0, 0.25, 0.251, -0.01], index=["a", "b", "c", "d"])
+    regimes = classify_curve_regime(slope)
+    assert regimes.tolist() == ["Flat", "Flat", "Normal", "Inverted"]
+
+
+def test_classify_curve_regime_custom_flat_threshold():
+    slope = pd.Series([0.05, 0.15, -0.02], index=["a", "b", "c"])
+    regimes = classify_curve_regime(slope, flat_threshold=0.1)
+    assert regimes.tolist() == ["Flat", "Normal", "Inverted"]
+
+
 def test_calculate_irf_returns_none_for_constant_series():
     df = pd.DataFrame({"shock": [0.0] * 50, "resp": [0.0] * 50})
     irf = calculate_irf(df, "resp", "shock", periods=5)

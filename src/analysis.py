@@ -254,6 +254,7 @@ def classify_curve_regime(
     flat_threshold: float = 0.25,
 ) -> pd.Series:
     regimes = pd.Series("Normal", index=slope.index)
+    regimes[slope.isna()] = "Insufficient data"
     regimes[slope < 0] = "Inverted"
     regimes[(slope >= 0) & (slope <= flat_threshold)] = "Flat"
     return regimes
