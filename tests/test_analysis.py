@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 from src.analysis import (
     build_beta_heatmap,
+    build_combined_stress_grid,
     build_stress_index,
     calculate_bond_portfolio_loss,
     calculate_correlation_matrix,
@@ -208,6 +209,16 @@ def test_build_stress_index():
     stress = build_stress_index(d_ff, r_vix, kbe, window=5, smoothing=3)
     assert stress.index.equals(idx)
     assert not stress.dropna().empty
+
+
+def test_build_combined_stress_grid_shape():
+    grid = build_combined_stress_grid(
+        outflow_range=np.array([0.0, 0.1]),
+        aoci_range=np.array([0.0, 0.2, 0.4]),
+        threshold=0.25,
+    )
+    assert grid.shape == (2, 3)
+    assert grid.iloc[-1, -1] == 1
 
 
 def test_event_study_car():

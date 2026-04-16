@@ -139,6 +139,20 @@ def build_stress_index(
     return stress
 
 
+def build_combined_stress_grid(
+    outflow_range: np.ndarray,
+    aoci_range: np.ndarray,
+    threshold: float = 0.25,
+) -> pd.DataFrame:
+    z = []
+    for outflow in outflow_range:
+        row = []
+        for aoci in aoci_range:
+            row.append(int(outflow + aoci >= threshold))
+        z.append(row)
+    return pd.DataFrame(z, index=outflow_range, columns=aoci_range)
+
+
 def build_beta_heatmap(beta_df: pd.DataFrame):
     """Builds a heatmap figure for rolling betas."""
     if beta_df.empty:
