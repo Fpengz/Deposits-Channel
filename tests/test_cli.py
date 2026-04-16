@@ -124,6 +124,26 @@ def test_monitoring_tab_matches_planned_structure() -> None:
     assert "then" in content.lower()
 
 
+def test_app_supports_package_and_script_imports() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert "from src.analysis import (" in content
+    assert "except ImportError:" in content
+    assert "from analysis import (" in content
+    assert "from src.data_fetcher import (" in content
+    assert "from src.simulation import (" in content
+
+
+def test_macro_sections_guard_all_join_dependencies() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert (
+        "if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:"
+        in content
+    )
+    assert "and not spy_proxy.empty" in content
+
+
 def test_monitoring_tab_uses_scenario_expectations_helper() -> None:
     content = Path("src/app.py").read_text()
 

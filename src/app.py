@@ -6,42 +6,82 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis import (
-    build_beta_heatmap,
-    build_combined_stress_grid,
-    build_stress_index,
-    calculate_bond_portfolio_loss,
-    calculate_correlation_matrix,
-    calculate_cross_correlation,
-    calculate_liquidity_proxy,
-    calculate_recursive_ols,
-    calculate_returns,
-    calculate_rolling_beta,
-    calculate_yield_curve_slope,
-    classify_channel_state,
-    classify_curve_regime,
-    event_study_car,
-    run_monte_carlo_simulation,
-    run_ols_regression,
-    scenario_expectations,
-)
-from data_fetcher import (
-    get_proxy_10y_yield,
-    get_proxy_credit_ig,
-    get_proxy_deposits,
-    get_proxy_fed_funds,
-    get_proxy_market,
-    get_proxy_mmf,
-    get_proxy_regional_banks,
-    get_proxy_volatility,
-)
-from simulation import (
-    calculate_deposit_rate,
-    calculate_deposit_volume,
-    counterfactual_channel_impact,
-    generate_deposit_paths,
-    generate_rate_paths,
-)
+try:
+    from src.analysis import (
+        build_beta_heatmap,
+        build_combined_stress_grid,
+        build_stress_index,
+        calculate_bond_portfolio_loss,
+        calculate_correlation_matrix,
+        calculate_cross_correlation,
+        calculate_irf,
+        calculate_liquidity_proxy,
+        calculate_recursive_ols,
+        calculate_returns,
+        calculate_rolling_beta,
+        calculate_yield_curve_slope,
+        classify_channel_state,
+        classify_curve_regime,
+        event_study_car,
+        run_monte_carlo_simulation,
+        run_ols_regression,
+        scenario_expectations,
+    )
+    from src.data_fetcher import (
+        get_proxy_10y_yield,
+        get_proxy_credit_ig,
+        get_proxy_deposits,
+        get_proxy_fed_funds,
+        get_proxy_market,
+        get_proxy_mmf,
+        get_proxy_regional_banks,
+        get_proxy_volatility,
+    )
+    from src.simulation import (
+        calculate_deposit_rate,
+        calculate_deposit_volume,
+        counterfactual_channel_impact,
+        generate_deposit_paths,
+        generate_rate_paths,
+    )
+except ImportError:
+    from analysis import (
+        build_beta_heatmap,
+        build_combined_stress_grid,
+        build_stress_index,
+        calculate_bond_portfolio_loss,
+        calculate_correlation_matrix,
+        calculate_cross_correlation,
+        calculate_irf,
+        calculate_liquidity_proxy,
+        calculate_recursive_ols,
+        calculate_returns,
+        calculate_rolling_beta,
+        calculate_yield_curve_slope,
+        classify_channel_state,
+        classify_curve_regime,
+        event_study_car,
+        run_monte_carlo_simulation,
+        run_ols_regression,
+        scenario_expectations,
+    )
+    from data_fetcher import (
+        get_proxy_10y_yield,
+        get_proxy_credit_ig,
+        get_proxy_deposits,
+        get_proxy_fed_funds,
+        get_proxy_market,
+        get_proxy_mmf,
+        get_proxy_regional_banks,
+        get_proxy_volatility,
+    )
+    from simulation import (
+        calculate_deposit_rate,
+        calculate_deposit_volume,
+        counterfactual_channel_impact,
+        generate_deposit_paths,
+        generate_rate_paths,
+    )
 
 # Suppress statsmodels frequency warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="statsmodels")
@@ -665,8 +705,6 @@ with tab2:
                 st.markdown(
                     "Impulse responses trace the shock ripple over the next 20 trading days."
                 )
-                from analysis import calculate_irf
-
                 irf_kbe = calculate_irf(data, "r_kbe", "d_ff", periods=20)
                 irf_iat = calculate_irf(data, "r_iat", "d_ff", periods=20)
 
@@ -748,7 +786,7 @@ with tab3:
     st.header("Macro & Credit")
     st.markdown("Follow the funding flow from deposits into the broader macro and credit system.")
 
-    if not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
+    if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
         macro_merged = (
             ff_proxy.join(mmf_proxy, lsuffix="_ff", rsuffix="_mmf")
             .join(tnx_proxy, rsuffix="_tnx")
@@ -858,7 +896,13 @@ with tab3:
     st.subheader("Q3: Is credit stress feeding back into banks?")
     st.markdown("We compare daily credit stress moves to bank returns.")
 
-    if not lqd_proxy.empty and not kbe_proxy.empty and not iat_proxy.empty:
+    if (
+        not ff_proxy.empty
+        and not lqd_proxy.empty
+        and not spy_proxy.empty
+        and not kbe_proxy.empty
+        and not iat_proxy.empty
+    ):
         credit_merged = (
             ff_proxy.join(lqd_proxy, rsuffix="_lqd")
             .join(spy_proxy, rsuffix="_spy")
