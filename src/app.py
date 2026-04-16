@@ -1080,6 +1080,91 @@ with tab4:
 with tab5:
     st.header("Monitoring & Scenarios")
     st.markdown("Use this section to track live signals and frame forward-looking stress cases.")
+    monitoring_frame = pd.DataFrame()
+    if not merged.empty:
+        monitoring_frame = merged[
+            (merged.index >= pd.to_datetime(start_date))
+            & (merged.index <= pd.to_datetime(end_date))
+        ].copy()
+
+    st.subheader("Signal Scorecard")
+    if monitoring_frame.empty:
+        scorecard_col1, scorecard_col2, scorecard_col3 = st.columns(3)
+        scorecard_col1.metric("Fed funds proxy", "N/A")
+        scorecard_col2.metric("Regional bank drawdown", "N/A")
+        scorecard_col3.metric("Volatility regime", "N/A")
+        st.caption("Scorecard updates when the selected timeframe has overlapping market data.")
+    else:
+        latest_row = monitoring_frame.iloc[-1]
+        iat_drawdown = latest_row["IAT"] / monitoring_frame["IAT"].max() - 1
+        scorecard_col1, scorecard_col2, scorecard_col3 = st.columns(3)
+        scorecard_col1.metric("Fed funds proxy", f"{latest_row['FF_Proxy']:.2f}%")
+        scorecard_col2.metric("Regional bank drawdown", f"{iat_drawdown:.1%}")
+        scorecard_col3.metric("Volatility regime", f"{latest_row['VIX']:.1f}")
+        st.caption(
+            "Use the scorecard as a quick read on rates pressure, bank equity strain, and whether volatility is turning from background noise into a regime signal."
+        )
+
+    st.subheader("Scenario Cards")
+    scenario_col1, scenario_col2 = st.columns(2)
+    with scenario_col1:
+        st.markdown("#### Higher for longer")
+        st.markdown(
+            "Deposit betas stay low while policy remains tight, extending margin pressure and keeping AOCI losses embedded."
+        )
+        st.markdown("Research: Watch whether spread widening persists even after growth slows.")
+        st.markdown(
+            "Investor: Favor banks with stickier deposits and shorter-duration securities books."
+        )
+        st.markdown("Policy/risk: Prepare for liquidity fatigue rather than a one-day event shock.")
+
+        st.markdown("#### Volatility shock")
+        st.markdown(
+            "A fast rise in VIX or rates volatility can turn a manageable spread story into a confidence and hedging problem."
+        )
+        st.markdown("Research: Separate flow-driven stress from a pure repricing episode.")
+        st.markdown("Investor: Expect regional-bank beta to gap wider than broad-bank beta.")
+        st.markdown(
+            "Policy/risk: Tighten surveillance when volatility spills into deposit behavior."
+        )
+
+    with scenario_col2:
+        st.markdown("#### Rapid cuts")
+        st.markdown(
+            "Policy eases quickly, relieving bond losses and deposit competition, but only if confidence is still intact."
+        )
+        st.markdown(
+            "Research: Test whether easing repairs funding faster than it repairs earnings."
+        )
+        st.markdown(
+            "Investor: Relief rallies are strongest where unrealized losses were the main overhang."
+        )
+        st.markdown(
+            "Policy/risk: Rate relief helps most when paired with clear liquidity signaling."
+        )
+
+        st.markdown("#### Bank-specific confidence shock")
+        st.markdown(
+            "Idiosyncratic deposit flight can overwhelm otherwise stable macro conditions once franchise trust breaks."
+        )
+        st.markdown("Research: Treat confidence breaks as nonlinear jumps, not smooth beta moves.")
+        st.markdown(
+            "Investor: Underwrite name-specific funding resilience, not just sector averages."
+        )
+        st.markdown(
+            "Policy/risk: Response speed matters more than broad easing when trust is the trigger."
+        )
+
+    st.subheader("If this, then that playbook")
+    st.markdown(
+        "Research takeaway: Escalate when scorecard pressure broadens across rates, volatility, and bank equity at the same time."
+    )
+    st.markdown(
+        "Investor takeaway: Add downside discipline when scenario signals move from macro pressure to confidence-driven deposit flight."
+    )
+    st.markdown(
+        "Policy/risk takeaway: Pair liquidity tools with communication early when stress looks nonlinear rather than cyclical."
+    )
 
 st.divider()
 with st.expander("Reference: Drechsler, Savov & Schnabl (2017)"):

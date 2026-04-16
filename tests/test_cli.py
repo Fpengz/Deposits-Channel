@@ -70,3 +70,9 @@ def test_case_study_counterfactual_labels_present() -> None:
 def test_monitoring_tab_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Monitoring & Scenarios" in content
+
+
+def test_monitoring_playbook_labels_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "If this, then that playbook" in content
+    assert "Higher for longer" in content
