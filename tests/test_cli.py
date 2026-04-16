@@ -76,3 +76,28 @@ def test_monitoring_playbook_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "If this, then that playbook" in content
     assert "Higher for longer" in content
+
+
+def test_monitoring_tab_matches_planned_structure() -> None:
+    content = Path("src/app.py").read_text()
+
+    for label in [
+        "Stress composite",
+        "Bank beta regime",
+        "Curve regime",
+        "MMF pressure",
+        "Credit stress trend",
+    ]:
+        assert label in content
+
+    for scenario in [
+        "Higher for longer",
+        "Rapid cuts",
+        "Volatility shock",
+        "Bank-specific confidence shock",
+    ]:
+        assert scenario in content
+
+    assert "Spreads | Deposits | Stress | Banks" in content
+    assert "if" in content.lower()
+    assert "then" in content.lower()
