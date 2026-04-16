@@ -65,3 +65,8 @@ def test_case_study_counterfactual_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Q4: What would have reduced the damage?" in content
     assert "Lower duration" in content
+
+
+def test_monitoring_tab_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Monitoring & Scenarios" in content

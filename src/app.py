@@ -70,9 +70,15 @@ with st.spinner("Fetching market data..."):
     tnx_proxy = get_proxy_10y_yield()
     lqd_proxy = get_proxy_credit_ig()
 
-# 4-Tab Structure (Question-Driven)
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Theory & Simulation", "Empirical Terminal", "Macro & Credit", "Case Study"]
+# 5-Tab Structure (Question-Driven)
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [
+        "Theory & Simulation",
+        "Empirical Terminal",
+        "Macro & Credit",
+        "Case Study",
+        "Monitoring & Scenarios",
+    ]
 )
 
 
@@ -1070,6 +1076,10 @@ with tab4:
             f"${var_95:,.0f}B",
             delta=f"-{(base_volume - var_95) / base_volume * 100:.1f}% Risk",
         )
+
+with tab5:
+    st.header("Monitoring & Scenarios")
+    st.markdown("Use this section to track live signals and frame forward-looking stress cases.")
 
 st.divider()
 with st.expander("Reference: Drechsler, Savov & Schnabl (2017)"):
