@@ -47,3 +47,9 @@ def test_empirical_terminal_drops_missing_factor_rows_before_regressions() -> No
     content = Path("src/app.py").read_text()
     assert 'required_empirical_factors = ["d_ff", "r_kbe", "r_iat", "r_spy"]' in content
     assert "data = data.dropna(subset=required_empirical_factors)" in content
+
+
+def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Selected timeframe does not have enough return/rate observations" in content
+    assert "if data.empty:" in content

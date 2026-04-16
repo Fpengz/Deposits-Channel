@@ -390,277 +390,301 @@ with tab2:
             data["r_iat"] = data_full.loc[data.index, "r_iat"]
             data["r_spy"] = data_full.loc[data.index, "r_spy"]
             data = data.dropna(subset=required_empirical_factors)
-
-            # Q1. Market Evolution
-            st.subheader("Q1: Are banks sensitive to rate shocks?")
-            st.markdown("We compare rate changes to bank and market performance.")
-            fig_ts = go.Figure()
-            fig_ts.add_trace(
-                go.Scatter(x=data.index, y=data["FF_Proxy"], name="FF Proxy (%)", yaxis="y1")
-            )
-            fig_ts.add_trace(
-                go.Scatter(x=data.index, y=data["KBE"], name="Broad Banks (KBE)", yaxis="y2")
-            )
-            fig_ts.add_trace(
-                go.Scatter(
-                    x=data.index,
-                    y=data["SPY"],
-                    name="Market (SPY)",
-                    yaxis="y2",
-                    line=dict(dash="dash"),
-                )
-            )
-            # FOMC Events
-            fomc_dates = ["2022-03-16", "2023-03-22", "2023-05-03"]
-            for d in fomc_dates:
-                dt = pd.to_datetime(d)
-                if dt in data.index:
-                    fig_ts.add_vline(x=dt, line_dash="dot", line_color="gray")
-                    fig_ts.add_annotation(
-                        x=dt,
-                        text="FOMC",
-                        showarrow=False,
-                        y=1,
-                        yref="paper",
-                        textangle=-90,
-                        yanchor="bottom",
-                    )
-            fig_ts.update_layout(
-                yaxis=dict(title="Yield (%)", side="left"),
-                yaxis2=dict(title="ETF Price", side="right", overlaying="y", showgrid=False),
-                template="plotly_white",
-            )
-            st.plotly_chart(fig_ts, width="stretch")
-
-            # Q1 continued: Sector Sensitivity
-            st.subheader("Q1 Deep Dive: Interest Rate Betas")
-            res_kbe = run_ols_regression(data, "r_kbe", "d_ff")
-            res_spy = run_ols_regression(data, "r_spy", "d_ff")
-            col1, col2 = st.columns(2)
-            col1.metric("Bank Beta", f"{res_kbe.params['d_ff']:.4f}")
-            col2.metric("Market Beta", f"{res_spy.params['d_ff']:.4f}")
-            st.caption(
-                "Lower (more negative) Beta means the sector is more sensitive to rate hikes. Banks typically show higher sensitivity."
-            )
-
-            # Q4. Sensitivity Stability
-            st.subheader("Q4: Is sensitivity stable over time?")
-            st.markdown("Recursive betas show whether rate exposure drifts through regimes.")
-            betas, se = calculate_recursive_ols(data, "r_kbe", "d_ff")
-            fig_rec = go.Figure()
-            fig_rec.add_trace(
-                go.Scatter(x=data.index, y=betas, name="Recursive Beta", line=dict(color="#1f77b4"))
-            )
-            fig_rec.add_trace(
-                go.Scatter(
-                    x=data.index, y=betas + 1.96 * se, line_color="rgba(0,0,0,0)", showlegend=False
-                )
-            )
-            fig_rec.add_trace(
-                go.Scatter(
-                    x=data.index,
-                    y=betas - 1.96 * se,
-                    fill="tonexty",
-                    fillcolor="rgba(31, 119, 180, 0.2)",
-                    name="95% Confidence Band",
-                )
-            )
-            fig_rec.update_layout(
-                title="Beta Stability Over Time",
-                xaxis_title="Date",
-                yaxis_title="Beta",
-                template="plotly_white",
-            )
-            st.plotly_chart(fig_rec, width="stretch")
-
-            # Q2. Stress Signal
-            st.subheader("Q2: Is stress building in the system?")
-            st.markdown("We combine rate shocks, volatility, and bank drawdowns into one signal.")
-            data["r_vix"] = calculate_returns(data["VIX"])
-            stress = build_stress_index(
-                data["d_ff"], data["r_vix"], data["KBE"], window=252, smoothing=5
-            )
-            if stress.dropna().empty:
-                st.warning("Not enough data to compute the Stress Composite Index.")
-            else:
-                threshold = stress.quantile(0.95)
-                fig_stress = go.Figure()
-                fig_stress.add_trace(go.Scatter(x=stress.index, y=stress, name="Stress Index"))
-                fig_stress.add_hline(y=threshold, line_dash="dash", line_color="red")
-                fig_stress.update_layout(
-                    title="Composite Stress Index (Rates + VIX + KBE Drawdown)",
-                    xaxis_title="Date",
-                    yaxis_title="Z-Score",
-                    template="plotly_white",
-                )
-                st.plotly_chart(fig_stress, width="stretch")
-
-                latest_bank_beta = res_kbe.params["d_ff"]
-                latest_stress = stress.dropna().iloc[-1]
-                if not mmf_proxy.empty:
-                    signal_frame = data[["KBE"]].copy()
-                    signal_frame["MMF"] = np.asarray(mmf_proxy.reindex(data.index)).reshape(-1)
-                    mmf_relative_series = (signal_frame["KBE"] / signal_frame["MMF"]).dropna()
-                else:
-                    mmf_relative_series = pd.Series(dtype=float)
-                if not mmf_relative_series.empty:
-                    mmf_relative = mmf_relative_series.iloc[-1] / mmf_relative_series.iloc[0] - 1
-                else:
-                    mmf_relative = np.nan
-                channel_state = classify_channel_state(
-                    latest_stress,
-                    latest_bank_beta,
-                    mmf_relative,
-                )
-
-                st.subheader("Signal Board")
-                board_col1, board_col2, board_col3 = st.columns(3)
-                board_col1.metric("Channel State", channel_state)
-                board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
-                board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
-                st.caption(
-                    "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
-                )
-
-            # Q3. Policy Event Impact
-            st.subheader("Q3: Do policy events create abnormal returns?")
-            st.markdown("We average cumulative abnormal returns around FOMC dates.")
-            event_dates = [
-                pd.to_datetime(d)
-                for d in ["2022-03-16", "2022-06-15", "2022-09-21", "2023-03-22", "2023-05-03"]
-            ]
-            returns_df = data[["r_kbe", "r_iat", "r_spy"]].rename(
-                columns={"r_kbe": "KBE", "r_iat": "IAT", "r_spy": "SPY"}
-            )
-            car = event_study_car(returns_df, event_dates, window=5, benchmark_col="SPY")
-            if car.empty:
-                st.warning("Not enough data to compute event study CARs for the selected period.")
-            else:
-                fig_car = go.Figure()
-                fig_car.add_trace(go.Scatter(x=car.index, y=car["KBE"], name="KBE CAR"))
-                fig_car.add_trace(
-                    go.Scatter(x=car.index, y=car["IAT"], name="IAT CAR", line=dict(color="red"))
-                )
-                fig_car.add_hline(y=0, line_dash="dash", line_color="gray")
-                fig_car.update_layout(
-                    title="Average Cumulative Abnormal Returns (±5 days)",
-                    xaxis_title="Event Day",
-                    yaxis_title="CAR",
-                    template="plotly_white",
-                )
-                st.plotly_chart(fig_car, width="stretch")
-
-            # Q4 Deep Dive
-            st.subheader("Q4 Deep Dive: Rolling Beta Heatmap")
-            beta_kbe = calculate_rolling_beta(data, "r_kbe", "d_ff", window=252)
-            beta_iat = calculate_rolling_beta(data, "r_iat", "d_ff", window=252)
-            beta_spy = calculate_rolling_beta(data, "r_spy", "d_ff", window=252)
-            beta_df = pd.DataFrame({"KBE": beta_kbe, "IAT": beta_iat, "SPY": beta_spy}).dropna()
-            if beta_df.empty:
-                st.warning("Not enough data to compute rolling betas.")
-            else:
-                fig_beta = build_beta_heatmap(beta_df)
-                fig_beta.update_layout(
-                    title="Rolling 1Y Beta vs FF Proxy",
-                    xaxis_title="Date",
-                    yaxis_title="Series",
-                    template="plotly_white",
-                )
-                st.plotly_chart(fig_beta, width="stretch")
-
-            # Q5. Fear Amplification
-            st.subheader("Q5: Does fear amplify the channel?")
-            st.markdown("We split betas by high vs low VIX to test amplification.")
-            high_vix = data[data["VIX"] > 20]
-            low_vix = data[data["VIX"] <= 20]
-
-            if not high_vix.empty and not low_vix.empty:
-                res_high = run_ols_regression(high_vix, "r_kbe", "d_ff")
-                res_low = run_ols_regression(low_vix, "r_kbe", "d_ff")
-
-                col1, col2 = st.columns(2)
-                col1.metric("Beta (VIX > 20)", f"{res_high.params['d_ff']:.4f}")
-                col2.metric("Beta (VIX <= 20)", f"{res_low.params['d_ff']:.4f}")
-                st.caption(
-                    "A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress."
-                )
-
-            # Q6. Shock Propagation
-            st.subheader("Q6: How do shocks propagate over time?")
-            st.markdown("Impulse responses trace the shock ripple over the next 20 trading days.")
-            from analysis import calculate_irf
-
-            irf_kbe = calculate_irf(data, "r_kbe", "d_ff", periods=20)
-            irf_iat = calculate_irf(data, "r_iat", "d_ff", periods=20)
-
-            if irf_kbe is None or irf_iat is None:
+            if data.empty:
                 st.warning(
-                    "IRF model failed to fit for the selected data window. Try a longer timeframe."
+                    "Selected timeframe does not have enough return/rate observations for empirical analysis."
                 )
             else:
-                fig_irf = go.Figure()
-                fig_irf.add_trace(
-                    go.Scatter(x=list(range(21)), y=irf_kbe, name="Response of Broad Banks (KBE)")
+                # Q1. Market Evolution
+                st.subheader("Q1: Are banks sensitive to rate shocks?")
+                st.markdown("We compare rate changes to bank and market performance.")
+                fig_ts = go.Figure()
+                fig_ts.add_trace(
+                    go.Scatter(x=data.index, y=data["FF_Proxy"], name="FF Proxy (%)", yaxis="y1")
                 )
-                fig_irf.add_trace(
+                fig_ts.add_trace(
+                    go.Scatter(x=data.index, y=data["KBE"], name="Broad Banks (KBE)", yaxis="y2")
+                )
+                fig_ts.add_trace(
                     go.Scatter(
-                        x=list(range(21)),
-                        y=irf_iat,
-                        name="Response of Regional Banks (IAT)",
-                        line=dict(color="red"),
+                        x=data.index,
+                        y=data["SPY"],
+                        name="Market (SPY)",
+                        yaxis="y2",
+                        line=dict(dash="dash"),
                     )
                 )
-                fig_irf.add_hline(y=0, line_dash="dash", line_color="gray")
-                fig_irf.update_layout(
-                    title="Impulse Response to 1-Unit Rate Shock",
-                    xaxis_title="Days since Shock",
-                    yaxis_title="Response (Returns)",
+                # FOMC Events
+                fomc_dates = ["2022-03-16", "2023-03-22", "2023-05-03"]
+                for d in fomc_dates:
+                    dt = pd.to_datetime(d)
+                    if dt in data.index:
+                        fig_ts.add_vline(x=dt, line_dash="dot", line_color="gray")
+                        fig_ts.add_annotation(
+                            x=dt,
+                            text="FOMC",
+                            showarrow=False,
+                            y=1,
+                            yref="paper",
+                            textangle=-90,
+                            yanchor="bottom",
+                        )
+                fig_ts.update_layout(
+                    yaxis=dict(title="Yield (%)", side="left"),
+                    yaxis2=dict(title="ETF Price", side="right", overlaying="y", showgrid=False),
                     template="plotly_white",
                 )
-                st.plotly_chart(fig_irf, width="stretch")
+                st.plotly_chart(fig_ts, width="stretch")
 
-            # Q7. Co-movement
-            st.divider()
-            st.subheader("Q7: How do the variables co-move?")
-            corr = calculate_correlation_matrix(
-                data[["d_ff", "r_kbe", "r_iat", "r_spy", "r_vix"]].dropna()
-            )
-            st.plotly_chart(
-                px.imshow(
-                    corr, text_auto=".2f", color_continuous_scale="Viridis", template="plotly_white"
-                ),
-                width="stretch",
-            )
+                # Q1 continued: Sector Sensitivity
+                st.subheader("Q1 Deep Dive: Interest Rate Betas")
+                res_kbe = run_ols_regression(data, "r_kbe", "d_ff")
+                res_spy = run_ols_regression(data, "r_spy", "d_ff")
+                col1, col2 = st.columns(2)
+                col1.metric("Bank Beta", f"{res_kbe.params['d_ff']:.4f}")
+                col2.metric("Market Beta", f"{res_spy.params['d_ff']:.4f}")
+                st.caption(
+                    "Lower (more negative) Beta means the sector is more sensitive to rate hikes. Banks typically show higher sensitivity."
+                )
 
-            st.subheader("Q8: Which regime are we in?")
-            if stress.dropna().empty:
-                st.warning("Not enough data to frame the current regime.")
-            else:
-                if channel_state == "Stressed":
-                    regime_label = "Stress regime"
-                elif channel_state == "Active":
-                    regime_label = "Transmission regime"
-                elif channel_state == "Dormant":
-                    regime_label = "Dormant regime"
+                # Q4. Sensitivity Stability
+                st.subheader("Q4: Is sensitivity stable over time?")
+                st.markdown("Recursive betas show whether rate exposure drifts through regimes.")
+                betas, se = calculate_recursive_ols(data, "r_kbe", "d_ff")
+                fig_rec = go.Figure()
+                fig_rec.add_trace(
+                    go.Scatter(
+                        x=data.index, y=betas, name="Recursive Beta", line=dict(color="#1f77b4")
+                    )
+                )
+                fig_rec.add_trace(
+                    go.Scatter(
+                        x=data.index,
+                        y=betas + 1.96 * se,
+                        line_color="rgba(0,0,0,0)",
+                        showlegend=False,
+                    )
+                )
+                fig_rec.add_trace(
+                    go.Scatter(
+                        x=data.index,
+                        y=betas - 1.96 * se,
+                        fill="tonexty",
+                        fillcolor="rgba(31, 119, 180, 0.2)",
+                        name="95% Confidence Band",
+                    )
+                )
+                fig_rec.update_layout(
+                    title="Beta Stability Over Time",
+                    xaxis_title="Date",
+                    yaxis_title="Beta",
+                    template="plotly_white",
+                )
+                st.plotly_chart(fig_rec, width="stretch")
+
+                # Q2. Stress Signal
+                st.subheader("Q2: Is stress building in the system?")
+                st.markdown(
+                    "We combine rate shocks, volatility, and bank drawdowns into one signal."
+                )
+                data["r_vix"] = calculate_returns(data["VIX"])
+                stress = build_stress_index(
+                    data["d_ff"], data["r_vix"], data["KBE"], window=252, smoothing=5
+                )
+                if stress.dropna().empty:
+                    st.warning("Not enough data to compute the Stress Composite Index.")
                 else:
-                    regime_label = "Data-building regime"
-                st.markdown(
-                    f"**Current regime:** {regime_label}. The signal board blends stress, bank beta, and bank-vs-MMF relative performance."
+                    threshold = stress.quantile(0.95)
+                    fig_stress = go.Figure()
+                    fig_stress.add_trace(go.Scatter(x=stress.index, y=stress, name="Stress Index"))
+                    fig_stress.add_hline(y=threshold, line_dash="dash", line_color="red")
+                    fig_stress.update_layout(
+                        title="Composite Stress Index (Rates + VIX + KBE Drawdown)",
+                        xaxis_title="Date",
+                        yaxis_title="Z-Score",
+                        template="plotly_white",
+                    )
+                    st.plotly_chart(fig_stress, width="stretch")
+
+                    latest_bank_beta = res_kbe.params["d_ff"]
+                    latest_stress = stress.dropna().iloc[-1]
+                    if not mmf_proxy.empty:
+                        signal_frame = data[["KBE"]].copy()
+                        signal_frame["MMF"] = np.asarray(mmf_proxy.reindex(data.index)).reshape(-1)
+                        mmf_relative_series = (signal_frame["KBE"] / signal_frame["MMF"]).dropna()
+                    else:
+                        mmf_relative_series = pd.Series(dtype=float)
+                    if not mmf_relative_series.empty:
+                        mmf_relative = (
+                            mmf_relative_series.iloc[-1] / mmf_relative_series.iloc[0] - 1
+                        )
+                    else:
+                        mmf_relative = np.nan
+                    channel_state = classify_channel_state(
+                        latest_stress,
+                        latest_bank_beta,
+                        mmf_relative,
+                    )
+
+                    st.subheader("Signal Board")
+                    board_col1, board_col2, board_col3 = st.columns(3)
+                    board_col1.metric("Channel State", channel_state)
+                    board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
+                    board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
+                    st.caption(
+                        "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
+                    )
+
+                # Q3. Policy Event Impact
+                st.subheader("Q3: Do policy events create abnormal returns?")
+                st.markdown("We average cumulative abnormal returns around FOMC dates.")
+                event_dates = [
+                    pd.to_datetime(d)
+                    for d in ["2022-03-16", "2022-06-15", "2022-09-21", "2023-03-22", "2023-05-03"]
+                ]
+                returns_df = data[["r_kbe", "r_iat", "r_spy"]].rename(
+                    columns={"r_kbe": "KBE", "r_iat": "IAT", "r_spy": "SPY"}
                 )
+                car = event_study_car(returns_df, event_dates, window=5, benchmark_col="SPY")
+                if car.empty:
+                    st.warning(
+                        "Not enough data to compute event study CARs for the selected period."
+                    )
+                else:
+                    fig_car = go.Figure()
+                    fig_car.add_trace(go.Scatter(x=car.index, y=car["KBE"], name="KBE CAR"))
+                    fig_car.add_trace(
+                        go.Scatter(
+                            x=car.index, y=car["IAT"], name="IAT CAR", line=dict(color="red")
+                        )
+                    )
+                    fig_car.add_hline(y=0, line_dash="dash", line_color="gray")
+                    fig_car.update_layout(
+                        title="Average Cumulative Abnormal Returns (±5 days)",
+                        xaxis_title="Event Day",
+                        yaxis_title="CAR",
+                        template="plotly_white",
+                    )
+                    st.plotly_chart(fig_car, width="stretch")
+
+                # Q4 Deep Dive
+                st.subheader("Q4 Deep Dive: Rolling Beta Heatmap")
+                beta_kbe = calculate_rolling_beta(data, "r_kbe", "d_ff", window=252)
+                beta_iat = calculate_rolling_beta(data, "r_iat", "d_ff", window=252)
+                beta_spy = calculate_rolling_beta(data, "r_spy", "d_ff", window=252)
+                beta_df = pd.DataFrame({"KBE": beta_kbe, "IAT": beta_iat, "SPY": beta_spy}).dropna()
+                if beta_df.empty:
+                    st.warning("Not enough data to compute rolling betas.")
+                else:
+                    fig_beta = build_beta_heatmap(beta_df)
+                    fig_beta.update_layout(
+                        title="Rolling 1Y Beta vs FF Proxy",
+                        xaxis_title="Date",
+                        yaxis_title="Series",
+                        template="plotly_white",
+                    )
+                    st.plotly_chart(fig_beta, width="stretch")
+
+                # Q5. Fear Amplification
+                st.subheader("Q5: Does fear amplify the channel?")
+                st.markdown("We split betas by high vs low VIX to test amplification.")
+                high_vix = data[data["VIX"] > 20]
+                low_vix = data[data["VIX"] <= 20]
+
+                if not high_vix.empty and not low_vix.empty:
+                    res_high = run_ols_regression(high_vix, "r_kbe", "d_ff")
+                    res_low = run_ols_regression(low_vix, "r_kbe", "d_ff")
+
+                    col1, col2 = st.columns(2)
+                    col1.metric("Beta (VIX > 20)", f"{res_high.params['d_ff']:.4f}")
+                    col2.metric("Beta (VIX <= 20)", f"{res_low.params['d_ff']:.4f}")
+                    st.caption(
+                        "A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress."
+                    )
+
+                # Q6. Shock Propagation
+                st.subheader("Q6: How do shocks propagate over time?")
                 st.markdown(
-                    "**Research takeaway:** Regime framing helps separate a live deposits-channel signal from routine market noise."
+                    "Impulse responses trace the shock ripple over the next 20 trading days."
                 )
-                st.markdown(
-                    "**Investor takeaway:** When the board turns more active, bank equity sensitivity deserves tighter monitoring."
+                from analysis import calculate_irf
+
+                irf_kbe = calculate_irf(data, "r_kbe", "d_ff", periods=20)
+                irf_iat = calculate_irf(data, "r_iat", "d_ff", periods=20)
+
+                if irf_kbe is None or irf_iat is None:
+                    st.warning(
+                        "IRF model failed to fit for the selected data window. Try a longer timeframe."
+                    )
+                else:
+                    fig_irf = go.Figure()
+                    fig_irf.add_trace(
+                        go.Scatter(
+                            x=list(range(21)), y=irf_kbe, name="Response of Broad Banks (KBE)"
+                        )
+                    )
+                    fig_irf.add_trace(
+                        go.Scatter(
+                            x=list(range(21)),
+                            y=irf_iat,
+                            name="Response of Regional Banks (IAT)",
+                            line=dict(color="red"),
+                        )
+                    )
+                    fig_irf.add_hline(y=0, line_dash="dash", line_color="gray")
+                    fig_irf.update_layout(
+                        title="Impulse Response to 1-Unit Rate Shock",
+                        xaxis_title="Days since Shock",
+                        yaxis_title="Response (Returns)",
+                        template="plotly_white",
+                    )
+                    st.plotly_chart(fig_irf, width="stretch")
+
+                # Q7. Co-movement
+                st.divider()
+                st.subheader("Q7: How do the variables co-move?")
+                corr = calculate_correlation_matrix(
+                    data[["d_ff", "r_kbe", "r_iat", "r_spy", "r_vix"]].dropna()
                 )
-                st.markdown(
-                    "**Policy/risk takeaway:** A stressed board suggests liquidity and confidence risks may be reinforcing each other."
+                st.plotly_chart(
+                    px.imshow(
+                        corr,
+                        text_auto=".2f",
+                        color_continuous_scale="Viridis",
+                        template="plotly_white",
+                    ),
+                    width="stretch",
                 )
 
-            st.subheader("Takeaway")
-            st.markdown(
-                "**Empirically, bank sensitivity to rates spikes in stress regimes and clusters around policy events.**"
-            )
+                st.subheader("Q8: Which regime are we in?")
+                if stress.dropna().empty:
+                    st.warning("Not enough data to frame the current regime.")
+                else:
+                    if channel_state == "Stressed":
+                        regime_label = "Stress regime"
+                    elif channel_state == "Active":
+                        regime_label = "Transmission regime"
+                    elif channel_state == "Dormant":
+                        regime_label = "Dormant regime"
+                    else:
+                        regime_label = "Data-building regime"
+                    st.markdown(
+                        f"**Current regime:** {regime_label}. The signal board blends stress, bank beta, and bank-vs-MMF relative performance."
+                    )
+                    st.markdown(
+                        "**Research takeaway:** Regime framing helps separate a live deposits-channel signal from routine market noise."
+                    )
+                    st.markdown(
+                        "**Investor takeaway:** When the board turns more active, bank equity sensitivity deserves tighter monitoring."
+                    )
+                    st.markdown(
+                        "**Policy/risk takeaway:** A stressed board suggests liquidity and confidence risks may be reinforcing each other."
+                    )
+
+                st.subheader("Takeaway")
+                st.markdown(
+                    "**Empirically, bank sensitivity to rates spikes in stress regimes and clusters around policy events.**"
+                )
 
 with tab3:
     st.header("Macro & Credit")
