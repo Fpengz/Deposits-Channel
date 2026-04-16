@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src import cli
 
 
@@ -21,3 +23,9 @@ def test_build_hooks_command_passes_extra_args() -> None:
     command = cli.build_command("hooks", ["tests/test_cli.py"])
 
     assert command == ["pre-commit", "run", "--all-files", "tests/test_cli.py"]
+
+
+def test_theory_tab_story_labels_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Q5: When do outflows and AOCI become destabilizing?" in content
+    assert "Research takeaway" in content

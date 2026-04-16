@@ -8,6 +8,7 @@ import streamlit as st
 
 from analysis import (
     build_beta_heatmap,
+    build_combined_stress_grid,
     build_stress_index,
     calculate_bond_portfolio_loss,
     calculate_correlation_matrix,
@@ -306,6 +307,41 @@ with tab1:
         template="plotly_white",
     )
     st.plotly_chart(fig_aoci, width="stretch")
+
+    st.subheader("Q5: When do outflows and AOCI become destabilizing?")
+    st.markdown(
+        "Outflow pressure becomes more dangerous when unrealized bond losses are already eating into capital. "
+        "This simple grid marks the zone where deposit runoff and AOCI losses combine into a destabilizing stress pocket."
+    )
+    outflow_range = np.linspace(0.0, 0.2, 5)
+    aoci_range = np.linspace(0.0, 0.15, 4)
+    combined_stress_grid = build_combined_stress_grid(
+        outflow_range=outflow_range,
+        aoci_range=aoci_range,
+        threshold=0.25,
+    )
+    fig_combined_stress = px.imshow(
+        combined_stress_grid,
+        x=[f"{value * 100:.0f}%" for value in combined_stress_grid.columns],
+        y=[f"{value * 100:.0f}%" for value in combined_stress_grid.index],
+        labels=dict(x="AOCI loss share", y="Deposit outflow share", color="Stress zone"),
+        color_continuous_scale=[[0, "#dfe7f2"], [1, "#b42318"]],
+        aspect="auto",
+    )
+    fig_combined_stress.update_layout(template="plotly_white")
+    st.plotly_chart(fig_combined_stress, width="stretch")
+    st.markdown(
+        "**What to notice:** Once both pressures build together, the safe region disappears quickly."
+    )
+    st.markdown(
+        "**Research takeaway:** The joint threshold matters more than either margin in isolation."
+    )
+    st.markdown(
+        "**Investor takeaway:** Watch for banks with both deposit flight and hidden bond losses."
+    )
+    st.markdown(
+        "**Policy/risk takeaway:** Liquidity backstops matter most when AOCI has already weakened buffers."
+    )
 
     st.subheader("Takeaway")
     st.markdown(
