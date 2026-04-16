@@ -330,6 +330,8 @@ def scenario_expectations(name: str) -> dict[str, str]:
             "banks": "Diverge",
         },
     }
+    if name not in mapping:
+        raise ValueError(f"Unknown scenario: {name}")
     return mapping[name]
 
 

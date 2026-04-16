@@ -292,3 +292,8 @@ def test_scenario_expectations_higher_for_longer():
     assert result["spreads"] == "Wider"
     assert result["deposits"] == "Weaker"
     assert result["banks"] == "Underperform"
+
+
+def test_scenario_expectations_unknown_name():
+    with pytest.raises(ValueError, match="Unknown scenario: Not a scenario"):
+        scenario_expectations("Not a scenario")
