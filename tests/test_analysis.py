@@ -23,6 +23,7 @@ from src.analysis import (
     rolling_zscore,
     run_monte_carlo_simulation,
     run_ols_regression,
+    scenario_expectations,
 )
 
 ...
@@ -283,3 +284,11 @@ def test_classify_channel_state_missing_data():
         )
         == "Insufficient data"
     )
+
+
+def test_scenario_expectations_higher_for_longer():
+    result = scenario_expectations("Higher for longer")
+
+    assert result["spreads"] == "Wider"
+    assert result["deposits"] == "Weaker"
+    assert result["banks"] == "Underperform"

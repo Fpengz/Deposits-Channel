@@ -303,6 +303,36 @@ def classify_channel_state(
     return "Dormant"
 
 
+def scenario_expectations(name: str) -> dict[str, str]:
+    mapping = {
+        "Higher for longer": {
+            "spreads": "Wider",
+            "deposits": "Weaker",
+            "stress": "Higher",
+            "banks": "Underperform",
+        },
+        "Rapid cuts": {
+            "spreads": "Narrower",
+            "deposits": "Stabilize",
+            "stress": "Lower",
+            "banks": "Rebound",
+        },
+        "Volatility shock": {
+            "spreads": "Wider",
+            "deposits": "Fragile",
+            "stress": "Higher",
+            "banks": "Sell off",
+        },
+        "Bank-specific confidence shock": {
+            "spreads": "Wider",
+            "deposits": "Run risk",
+            "stress": "Higher",
+            "banks": "Diverge",
+        },
+    }
+    return mapping[name]
+
+
 def detect_monetary_regimes(ff_series: pd.Series, window: int = 20) -> pd.Series:
     """Detects 'Hiking' vs 'Easing' regimes based on a rolling average of proxy changes."""
     # Smoothed change to avoid noise
