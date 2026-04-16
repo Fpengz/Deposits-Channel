@@ -12,7 +12,6 @@ from analysis import (
     build_stress_index,
     calculate_bond_portfolio_loss,
     calculate_correlation_matrix,
-    calculate_credit_spread,
     calculate_cross_correlation,
     calculate_liquidity_proxy,
     calculate_recursive_ols,
@@ -24,6 +23,7 @@ from analysis import (
     event_study_car,
     run_monte_carlo_simulation,
     run_ols_regression,
+    scenario_expectations,
 )
 from data_fetcher import (
     get_proxy_10y_yield,
@@ -81,6 +81,52 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
         "Monitoring & Scenarios",
     ]
 )
+
+
+def _build_recent_stress_series(frame: pd.DataFrame) -> pd.Series:
+    for lookback in (252, 126, 63, 21, 10, 5):
+        recent = frame.tail(lookback).copy()
+        if len(recent) < 2:
+            continue
+        stress_series = build_stress_index(
+            recent["d_ff"],
+            recent["r_vix"],
+            recent["KBE"],
+            window=min(lookback, len(recent)),
+            smoothing=min(5, len(recent)),
+        ).dropna()
+        if not stress_series.empty:
+            return stress_series
+    return pd.Series(dtype=float)
+
+
+def _recent_beta_regime(frame: pd.DataFrame) -> tuple[float | None, str | None]:
+    for lookback in (252, 126, 63, 21, 10, 5):
+        recent = frame.tail(lookback).dropna()
+        if len(recent) < 5:
+            continue
+        if recent["d_ff"].std() == 0 or recent["r_kbe"].std() == 0:
+            continue
+        beta_model = run_ols_regression(recent, "r_kbe", "d_ff")
+        latest_bank_beta = beta_model.params["d_ff"]
+        if latest_bank_beta <= -0.2:
+            return latest_bank_beta, "Amplifying"
+        if latest_bank_beta <= -0.05:
+            return latest_bank_beta, "Leaning negative"
+        return latest_bank_beta, "Contained"
+    return None, None
+
+
+def _recent_change(series: pd.Series) -> float:
+    for lookback in (252, 126, 63, 21, 10, 5):
+        recent = series.dropna().tail(lookback)
+        if len(recent) < 2:
+            continue
+        first = recent.iloc[0]
+        last = recent.iloc[-1]
+        if pd.notna(first) and pd.notna(last) and first != 0:
+            return last / first - 1
+    return np.nan
 
 
 with tab1:
@@ -822,11 +868,8 @@ with tab3:
             & (credit_merged.index <= pd.to_datetime(end_date))
         ]
 
-        # Calculate proxy spread stress
-        # Higher index = higher cost of credit relative to risk-free
-        credit_data["Spread_Stress"] = calculate_credit_spread(
-            credit_data["Credit_Price"], credit_data["FF_Proxy"] / 100 + 1
-        )  # Normalizing
+        # Use the recent LQD price trend as a direct credit stress proxy.
+        credit_data["Credit_Stress_Trend"] = -credit_data["Credit_Price"].pct_change()
 
         st.subheader("1. Lending Conditions Proxy")
         st.markdown(
@@ -855,7 +898,7 @@ with tab3:
             fig_scatter = go.Figure()
             fig_scatter.add_trace(
                 go.Scatter(
-                    x=credit_scatter["Spread_Stress"].diff(),
+                    x=credit_scatter["Credit_Stress_Trend"].diff(),
                     y=credit_scatter["r_kbe"],
                     mode="markers",
                     name="KBE",
@@ -863,7 +906,7 @@ with tab3:
             )
             fig_scatter.add_trace(
                 go.Scatter(
-                    x=credit_scatter["Spread_Stress"].diff(),
+                    x=credit_scatter["Credit_Stress_Trend"].diff(),
                     y=credit_scatter["r_iat"],
                     mode="markers",
                     name="IAT",
@@ -880,7 +923,7 @@ with tab3:
 
         st.subheader("Q4: Do rates lead credit stress?")
         d_ff = credit_data["FF_Proxy"].diff().dropna()
-        spread_change = credit_data["Spread_Stress"].diff().dropna()
+        spread_change = credit_data["Credit_Stress_Trend"].diff().dropna()
         aligned_ff, aligned_spread = d_ff.align(spread_change, join="inner")
         lags, coeffs = calculate_cross_correlation(aligned_ff, aligned_spread, max_lag=15)
         if np.all(np.isnan(coeffs)):
@@ -1113,14 +1156,7 @@ with tab5:
         scorecard_frame["d_ff"] = scorecard_frame["FF_Proxy"].diff()
         scorecard_frame["r_vix"] = calculate_returns(scorecard_frame["VIX"])
 
-        stress_series = build_stress_index(
-            scorecard_frame["d_ff"],
-            scorecard_frame["r_vix"],
-            scorecard_frame["KBE"],
-            window=252,
-            smoothing=5,
-        )
-        stress_latest = stress_series.dropna()
+        stress_latest = _build_recent_stress_series(scorecard_frame)
         if not stress_latest.empty:
             latest_stress = stress_latest.iloc[-1]
             stress_value = f"{latest_stress:.2f}"
@@ -1130,15 +1166,9 @@ with tab5:
         beta_frame["r_kbe"] = beta_frame["KBE"].pct_change()
         beta_frame["d_ff"] = beta_frame["FF_Proxy"].diff()
         beta_frame = beta_frame.dropna()
-        if len(beta_frame) >= 20 and beta_frame["d_ff"].std() > 0 and beta_frame["r_kbe"].std() > 0:
-            beta_model = run_ols_regression(beta_frame, "r_kbe", "d_ff")
-            latest_bank_beta = beta_model.params["d_ff"]
-            if latest_bank_beta <= -0.2:
-                beta_value = "Amplifying"
-            elif latest_bank_beta <= -0.05:
-                beta_value = "Leaning negative"
-            else:
-                beta_value = "Contained"
+        latest_bank_beta, bank_beta_regime = _recent_beta_regime(beta_frame)
+        if latest_bank_beta is not None and bank_beta_regime is not None:
+            beta_value = bank_beta_regime
             beta_delta = f"β={latest_bank_beta:.2f}"
 
         curve_frame = pd.DataFrame()
@@ -1166,8 +1196,8 @@ with tab5:
                 (mmf_frame.index >= pd.to_datetime(start_date))
                 & (mmf_frame.index <= pd.to_datetime(end_date))
             ].copy()
-            if len(mmf_frame) >= 21:
-                mmf_trend = mmf_frame["MMF_Price"].iloc[-1] / mmf_frame["MMF_Price"].iloc[-21] - 1
+            mmf_trend = _recent_change(mmf_frame["MMF_Price"])
+            if not np.isnan(mmf_trend):
                 mmf_value = "Pressure building" if mmf_trend > 0 else "Pressure easing"
                 mmf_delta = f"20d={mmf_trend:+.1%}"
 
@@ -1179,15 +1209,10 @@ with tab5:
                 (credit_frame.index >= pd.to_datetime(start_date))
                 & (credit_frame.index <= pd.to_datetime(end_date))
             ].copy()
-            if len(credit_frame) >= 21:
-                credit_frame["Spread_Stress"] = calculate_credit_spread(
-                    credit_frame["Credit_Price"], credit_frame["FF_Proxy"] / 100 + 1
-                )
-                credit_trend = (
-                    credit_frame["Spread_Stress"].iloc[-1] - credit_frame["Spread_Stress"].iloc[-21]
-                )
+            credit_trend = -_recent_change(credit_frame["Credit_Price"])
+            if not np.isnan(credit_trend):
                 credit_value = "Stress rising" if credit_trend > 0 else "Stress easing"
-                credit_delta = f"20d={credit_trend:+.2f}"
+                credit_delta = f"20d={credit_trend:+.1%}"
 
         scorecard_col1.metric("Stress composite", stress_value, delta=stress_delta)
         scorecard_col2.metric("Bank beta regime", beta_value, delta=beta_delta)
@@ -1202,85 +1227,90 @@ with tab5:
 
     def render_scenario_card(
         title: str,
-        spreads: str,
-        deposits: str,
-        stress: str,
-        banks: str,
         research_takeaway: str,
         investor_takeaway: str,
         policy_takeaway: str,
     ) -> None:
+        expectations = scenario_expectations(title)
         st.markdown(f"#### {title}")
         st.markdown(
-            f"**Spreads | Deposits | Stress | Banks**\n\n{spreads} | {deposits} | {stress} | {banks}"
+            f"**Spreads | Deposits | Stress | Banks**\n\n{expectations['spreads']} | {expectations['deposits']} | {expectations['stress']} | {expectations['banks']}"
         )
         st.markdown(f"**Research takeaway:** {research_takeaway}")
         st.markdown(f"**Investor takeaway:** {investor_takeaway}")
         st.markdown(f"**Policy/risk takeaway:** {policy_takeaway}")
 
     scenario_col1, scenario_col2 = st.columns(2)
-    with scenario_col1:
-        render_scenario_card(
+    scenario_specs = [
+        (
             "Higher for longer",
-            "Wider and sticky",
-            "Betas stay elevated",
-            "Composite stress stays high",
-            "Funding-sensitive banks lag",
             "Watch whether spread widening persists even after growth slows.",
             "Favor banks with stickier deposits and shorter-duration securities books.",
             "Prepare for liquidity fatigue rather than a one-day event shock.",
-        )
-        render_scenario_card(
+        ),
+        (
             "Volatility shock",
-            "Wider on repricing",
-            "Deposits become flighty",
-            "Stress jumps before fundamentals move",
-            "Regional-bank beta gaps wider",
             "Separate flow-driven stress from a pure repricing episode.",
             "Expect regional-bank beta to gap wider than broad-bank beta.",
             "Tighten surveillance when volatility spills into deposit behavior.",
-        )
-
-    with scenario_col2:
-        render_scenario_card(
+        ),
+        (
             "Rapid cuts",
-            "Narrower as policy eases",
-            "Competition cools",
-            "Stress falls if confidence holds",
-            "Loss-heavy banks can rebound",
             "Test whether easing repairs funding faster than it repairs earnings.",
             "Relief rallies are strongest where unrealized losses were the main overhang.",
             "Rate relief helps most when paired with clear liquidity signaling.",
-        )
-        render_scenario_card(
+        ),
+        (
             "Bank-specific confidence shock",
-            "Wider on name-specific spread pressure",
-            "Run risk dominates",
-            "Stress turns nonlinear",
-            "Sector averages stop being enough",
             "Treat confidence breaks as nonlinear jumps, not smooth beta moves.",
             "Underwrite name-specific funding resilience, not just sector averages.",
             "Response speed matters more than broad easing when trust is the trigger.",
-        )
+        ),
+    ]
+
+    with scenario_col1:
+        for title, research_takeaway, investor_takeaway, policy_takeaway in scenario_specs[:2]:
+            render_scenario_card(title, research_takeaway, investor_takeaway, policy_takeaway)
+
+    with scenario_col2:
+        for title, research_takeaway, investor_takeaway, policy_takeaway in scenario_specs[2:]:
+            render_scenario_card(title, research_takeaway, investor_takeaway, policy_takeaway)
 
     st.subheader("If this, then that playbook")
-    st.markdown(
-        "**If** Stress composite is elevated and Bank beta regime is Amplifying, **then** raise funding surveillance, tighten name-specific limits, and treat the move as a regime shift.\n\n"
-        "**Research takeaway:** Escalate when rate sensitivity broadens into bank equity and funding signals at the same time.\n"
-        "**Investor takeaway:** Reduce downside exposure when bank beta starts amplifying instead of just drifting.\n"
-        "**Policy/risk takeaway:** Pair liquidity tools with communication early when stress is broadening."
+
+    def render_playbook_rule(
+        rule: str, research_takeaway: str, investor_takeaway: str, policy_takeaway: str
+    ) -> None:
+        st.markdown(
+            f"**{rule}**\n\n"
+            f"**Research takeaway:** {research_takeaway}\n"
+            f"**Investor takeaway:** {investor_takeaway}\n"
+            f"**Policy/risk takeaway:** {policy_takeaway}"
+        )
+
+    render_playbook_rule(
+        "If rates rise while VIX stays low: expect orderly spread widening before panic.",
+        "Orderly widening usually appears before fear is visible in volatility.",
+        "Prefer names that can reprice deposits without losing franchise stability.",
+        "Use calm volatility as a signal to watch spreads before stress is obvious.",
     )
-    st.markdown(
-        "**If** Curve regime is Flat or Inverted and MMF pressure is building, **then** expect deposit migration, shorten duration, and watch for weaker franchise persistence.\n\n"
-        "**Research takeaway:** Flat or inverted curves matter most when MMF pressure confirms the deposit trade is active.\n"
-        "**Investor takeaway:** Favor balance sheets that can absorb funding rotation without forcing asset sales.\n"
-        "**Policy/risk takeaway:** Keep liquidity backstops visible before the curve signal becomes acute."
+    render_playbook_rule(
+        "If rates are stable but VIX spikes: expect fear to dominate rate mechanics.",
+        "Volatility shocks can overwhelm an otherwise stable rate backdrop.",
+        "Reduce exposure where sentiment can outrun fundamentals.",
+        "Treat elevated volatility as a funding-confidence issue even without a rate move.",
     )
-    st.markdown(
-        "**If** Credit stress trend is rising alongside a Volatility shock or a Bank-specific confidence shock, **then** separate macro noise from idiosyncratic run risk and escalate faster than a normal cyclical response.\n\n"
-        "**Research takeaway:** Credit stress becomes more informative when volatility or trust breaks appear at the same time.\n"
-        "**Investor takeaway:** Treat non-linear trust breaks as a capital-preservation event, not a trading bounce.\n"
-        "**Policy/risk takeaway:** Prioritize communication and liquidity backstops over broad easing when confidence is the trigger."
+    render_playbook_rule(
+        "If the curve steepens through cuts: expect temporary relief in funding stress.",
+        "Curve steepening from easing can buy time for balance sheets that were under pressure.",
+        "Look for relief, but do not mistake it for a fully repaired franchise.",
+        "Use easing windows to reinforce liquidity backstops before stress returns.",
+    )
+    render_playbook_rule(
+        "If MMFs outperform while bank betas stay negative: treat that as an active-channel warning.",
+        "MMF outperformance alongside negative bank beta says the deposit trade is still live.",
+        "Favor banks with stickier funding and less reliance on hot money.",
+        "Treat the combination as an active migration signal, not a benign rotation.",
     )
 
 st.divider()

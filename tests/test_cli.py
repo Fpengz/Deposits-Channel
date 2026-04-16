@@ -101,3 +101,43 @@ def test_monitoring_tab_matches_planned_structure() -> None:
     assert "Spreads | Deposits | Stress | Banks" in content
     assert "if" in content.lower()
     assert "then" in content.lower()
+
+
+def test_monitoring_tab_uses_scenario_expectations_helper() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert "scenario_expectations(" in content
+
+
+def test_monitoring_scorecard_uses_shorter_lookback_fallbacks() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert "_build_recent_stress_series(" in content
+    assert "_recent_beta_regime(" in content
+    assert "_recent_change(" in content
+    assert "for lookback in (252, 126, 63, 21, 10, 5):" in content
+
+
+def test_monitoring_credit_trend_does_not_normalize_ff_proxy_into_treasury_price() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert 'credit_data["Credit_Price"], credit_data["FF_Proxy"] / 100 + 1' not in content
+    assert 'credit_frame["Credit_Price"], credit_frame["FF_Proxy"] / 100 + 1' not in content
+    assert "Credit_Stress_Trend" in content
+    assert '_recent_change(credit_frame["Credit_Price"])' in content
+
+
+def test_monitoring_playbook_contains_exact_planned_rules() -> None:
+    content = Path("src/app.py").read_text()
+
+    assert (
+        "If rates rise while VIX stays low: expect orderly spread widening before panic." in content
+    )
+    assert "If rates are stable but VIX spikes: expect fear to dominate rate mechanics." in content
+    assert (
+        "If the curve steepens through cuts: expect temporary relief in funding stress." in content
+    )
+    assert (
+        "If MMFs outperform while bank betas stay negative: treat that as an active-channel warning."
+        in content
+    )
