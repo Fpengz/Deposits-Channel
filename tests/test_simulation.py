@@ -39,5 +39,6 @@ def test_counterfactual_impact_reduces_with_lower_duration():
         deposit_friction=0.5,
     )
 
-    assert result["aoci_loss"] < 12.0
-    assert result["total_impact"] > 0
+    assert result["deposit_outflow"] == 6.0
+    assert result["aoci_loss"] == 2.4
+    assert result["total_impact"] == 8.4

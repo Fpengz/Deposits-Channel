@@ -1,5 +1,7 @@
 import numpy as np
 
+from src.analysis import calculate_bond_portfolio_loss
+
 
 def calculate_deposit_rate(fed_funds_rate: float, market_power: float) -> float:
     """
@@ -50,9 +52,16 @@ def counterfactual_channel_impact(
     rate_change: float,
     duration: float,
     deposit_friction: float,
+    bond_base_value: float = 60.0,
 ) -> dict[str, float]:
     adjusted_outflow = deposit_outflow * (1.0 - deposit_friction)
-    aoci_loss = abs(duration * rate_change * 100)
+    aoci_loss = abs(
+        calculate_bond_portfolio_loss(
+            base_value=bond_base_value,
+            rate_change=rate_change,
+            duration=duration,
+        )
+    )
     total_impact = adjusted_outflow + aoci_loss
     return {
         "deposit_outflow": adjusted_outflow,
