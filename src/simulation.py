@@ -43,3 +43,19 @@ def generate_deposit_paths(rate_paths, market_power: float, base_volume: float, 
             vols.append(calculate_deposit_volume(base_volume, spread, elasticity))
         deposit_paths.append(vols)
     return np.array(deposit_paths)
+
+
+def counterfactual_channel_impact(
+    deposit_outflow: float,
+    rate_change: float,
+    duration: float,
+    deposit_friction: float,
+) -> dict[str, float]:
+    adjusted_outflow = deposit_outflow * (1.0 - deposit_friction)
+    aoci_loss = abs(duration * rate_change * 100)
+    total_impact = adjusted_outflow + aoci_loss
+    return {
+        "deposit_outflow": adjusted_outflow,
+        "aoci_loss": aoci_loss,
+        "total_impact": total_impact,
+    }
