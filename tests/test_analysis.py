@@ -207,10 +207,43 @@ def test_build_beta_heatmap_returns_figure():
     assert isinstance(fig, go.Figure)
 
 
-def test_classify_channel_state():
+@pytest.mark.parametrize(
+    "stress_value, bank_beta, mmf_relative, expected",
+    [
+        (1.9, -0.8, -0.12, "Stressed"),
+        (0.8, -0.1, -0.01, "Active"),
+        (0.2, -0.1, -0.01, "Dormant"),
+    ],
+)
+def test_classify_channel_state(stress_value, bank_beta, mmf_relative, expected):
     state = classify_channel_state(
-        stress_value=1.9,
-        bank_beta=-0.8,
-        mmf_relative=-0.12,
+        stress_value=stress_value,
+        bank_beta=bank_beta,
+        mmf_relative=mmf_relative,
     )
-    assert state == "Stressed"
+    assert state == expected
+
+
+def test_classify_channel_state_thresholds():
+    assert classify_channel_state(1.5, 0.0, 0.0) == "Stressed"
+    assert classify_channel_state(0.75, 0.0, 0.0) == "Active"
+    assert classify_channel_state(0.74, -0.2, -0.02) == "Dormant"
+
+
+def test_classify_channel_state_missing_data():
+    assert (
+        classify_channel_state(
+            stress_value=np.nan,
+            bank_beta=-0.1,
+            mmf_relative=-0.01,
+        )
+        == "Insufficient data"
+    )
+    assert (
+        classify_channel_state(
+            stress_value=0.2,
+            bank_beta=np.nan,
+            mmf_relative=-0.01,
+        )
+        == "Insufficient data"
+    )

@@ -269,6 +269,8 @@ def classify_channel_state(
     bank_beta: float,
     mmf_relative: float,
 ) -> str:
+    if pd.isna(stress_value) or pd.isna(bank_beta) or pd.isna(mmf_relative):
+        return "Insufficient data"
     if stress_value >= 1.5 or (bank_beta < -0.5 and mmf_relative < -0.05):
         return "Stressed"
     if stress_value >= 0.75 or bank_beta < -0.2 or mmf_relative < -0.02:
