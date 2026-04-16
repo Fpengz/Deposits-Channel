@@ -29,3 +29,9 @@ def test_theory_tab_story_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Q5: When do outflows and AOCI become destabilizing?" in content
     assert "Research takeaway" in content
+
+
+def test_empirical_terminal_signal_board_labels_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Signal Board" in content
+    assert "Dormant" in content

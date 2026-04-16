@@ -19,6 +19,7 @@ from analysis import (
     calculate_returns,
     calculate_rolling_beta,
     calculate_yield_curve_slope,
+    classify_channel_state,
     event_study_car,
     run_monte_carlo_simulation,
     run_ols_regression,
@@ -381,6 +382,8 @@ with tab2:
             data_full["r_kbe"] = data_full["KBE"].pct_change()
             data_full["r_iat"] = data_full["IAT"].pct_change()
             data_full["r_spy"] = data_full["SPY"].pct_change()
+            if not mmf_proxy.empty:
+                data_full["MMF"] = mmf_proxy.reindex(data_full.index).squeeze()
             data = data_full.dropna()
 
             # Q1. Market Evolution
@@ -486,6 +489,28 @@ with tab2:
                     template="plotly_white",
                 )
                 st.plotly_chart(fig_stress, width="stretch")
+
+                latest_bank_beta = res_kbe.params["d_ff"]
+                latest_stress = stress.dropna().iloc[-1]
+                if "MMF" in data.columns:
+                    mmf_relative_series = (data["KBE"] / data["MMF"]).dropna()
+                    mmf_relative = mmf_relative_series.iloc[-1] / mmf_relative_series.iloc[0] - 1
+                else:
+                    mmf_relative = np.nan
+                channel_state = classify_channel_state(
+                    latest_stress,
+                    latest_bank_beta,
+                    mmf_relative,
+                )
+
+                st.subheader("Signal Board")
+                board_col1, board_col2, board_col3 = st.columns(3)
+                board_col1.metric("Channel State", channel_state)
+                board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
+                board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
+                st.caption(
+                    "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
+                )
 
             # Q3. Policy Event Impact
             st.subheader("Q3: Do policy events create abnormal returns?")
@@ -596,6 +621,31 @@ with tab2:
                 ),
                 width="stretch",
             )
+
+            st.subheader("Q8: Which regime are we in?")
+            if stress.dropna().empty:
+                st.warning("Not enough data to frame the current regime.")
+            else:
+                if channel_state == "Stressed":
+                    regime_label = "Stress regime"
+                elif channel_state == "Active":
+                    regime_label = "Transmission regime"
+                elif channel_state == "Dormant":
+                    regime_label = "Dormant regime"
+                else:
+                    regime_label = "Data-building regime"
+                st.markdown(
+                    f"**Current regime:** {regime_label}. The signal board blends stress, bank beta, and bank-vs-MMF relative performance."
+                )
+                st.markdown(
+                    "**Research takeaway:** Regime framing helps separate a live deposits-channel signal from routine market noise."
+                )
+                st.markdown(
+                    "**Investor takeaway:** When the board turns more active, bank equity sensitivity deserves tighter monitoring."
+                )
+                st.markdown(
+                    "**Policy/risk takeaway:** A stressed board suggests liquidity and confidence risks may be reinforcing each other."
+                )
 
             st.subheader("Takeaway")
             st.markdown(
