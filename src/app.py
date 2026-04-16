@@ -37,6 +37,7 @@ from data_fetcher import (
 from simulation import (
     calculate_deposit_rate,
     calculate_deposit_volume,
+    counterfactual_channel_impact,
     generate_deposit_paths,
     generate_rate_paths,
 )
@@ -913,6 +914,9 @@ with tab4:
         if not crisis_data.empty:
             st.subheader("Q1: What broke in March 2023?")
             st.markdown("Regional banks diverged as deposit outflows and AOCI losses accelerated.")
+            st.markdown(
+                "**Timeline:** February rate pressure hit bond values, March 10 marked the SVB collapse, and the following days became a system-wide confidence test."
+            )
             fig_svb = go.Figure()
             fig_svb.add_trace(
                 go.Scatter(x=crisis_data.index, y=crisis_data["KBE"], name="Broad Banks (KBE)")
@@ -997,10 +1001,51 @@ with tab4:
                 template="plotly_white",
             )
             st.plotly_chart(fig_waterfall, width="stretch")
+            st.markdown(
+                "**Waterfall framing:** the damage compounded in sequence as deposit flight exposed bond losses and then widened the equity penalty for regionals."
+            )
+
+            st.subheader("Q4: What would have reduced the damage?")
+            st.markdown(
+                "We run simple counterfactuals to show which balance-sheet choices would have softened the shock."
+            )
+            counterfactuals = {
+                "Lower duration": counterfactual_channel_impact(
+                    deposit_outflow=deposit_outflow,
+                    rate_change=rate_change,
+                    duration=2.0,
+                    deposit_friction=0.2,
+                ),
+                "Higher stickiness": counterfactual_channel_impact(
+                    deposit_outflow=deposit_outflow,
+                    rate_change=rate_change,
+                    duration=duration,
+                    deposit_friction=0.6,
+                ),
+                "Less concentrated system": counterfactual_channel_impact(
+                    deposit_outflow=max(deposit_outflow * 0.7, 0.0),
+                    rate_change=rate_change,
+                    duration=duration,
+                    deposit_friction=0.3,
+                ),
+            }
+            st.dataframe(pd.DataFrame(counterfactuals).T, width="stretch")
+            st.markdown(
+                "**What to notice:** lower duration and stickier deposits shrink the crisis path before equity divergence spirals."
+            )
 
             st.subheader("Takeaway")
             st.markdown(
                 "**The 2023 episode shows how fast liquidity outflows and AOCI losses can propagate into equity stress.**"
+            )
+            st.markdown(
+                "**Research takeaway:** March 2023 exposed where the canonical channel became nonlinear."
+            )
+            st.markdown(
+                "**Investor takeaway:** Large-bank resilience and regional fragility reflected very different funding narratives."
+            )
+            st.markdown(
+                "**Policy/risk takeaway:** Lower duration and more stable deposits are complementary crisis-mitigation levers."
             )
         else:
             st.warning("Crisis period data not available in current fetch.")

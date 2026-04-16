@@ -59,3 +59,9 @@ def test_macro_regime_matrix_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Regime Matrix" in content
     assert "Crisis" in content
+
+
+def test_case_study_counterfactual_labels_present() -> None:
+    content = Path("src/app.py").read_text()
+    assert "Q4: What would have reduced the damage?" in content
+    assert "Lower duration" in content
