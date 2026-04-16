@@ -15,6 +15,7 @@ from src.analysis import (
     calculate_rolling_beta,
     check_stationarity,
     classify_channel_state,
+    classify_curve_regime,
     detect_monetary_regimes,
     estimate_var_forecast,
     event_study_car,
@@ -116,6 +117,12 @@ def test_detect_monetary_regimes():
     regimes = detect_monetary_regimes(ff, window=2)
     assert "Hiking" in regimes.values
     assert "Easing" in regimes.values
+
+
+def test_classify_curve_regime():
+    slope = pd.Series([1.2, 0.1, -0.3], index=["a", "b", "c"])
+    regimes = classify_curve_regime(slope)
+    assert regimes.tolist() == ["Normal", "Flat", "Inverted"]
 
 
 def test_calculate_irf_returns_none_for_constant_series():

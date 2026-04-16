@@ -249,6 +249,16 @@ def calculate_credit_spread(credit_price: pd.Series, treasury_price: pd.Series) 
     return treasury_price / credit_price
 
 
+def classify_curve_regime(
+    slope: pd.Series,
+    flat_threshold: float = 0.25,
+) -> pd.Series:
+    regimes = pd.Series("Normal", index=slope.index)
+    regimes[slope < 0] = "Inverted"
+    regimes[(slope >= 0) & (slope <= flat_threshold)] = "Flat"
+    return regimes
+
+
 def calculate_cross_correlation(s1: pd.Series, s2: pd.Series, max_lag: int = 15):
     """Calculates cross-correlation between two series at various lags."""
     lags = range(-max_lag, max_lag + 1)
