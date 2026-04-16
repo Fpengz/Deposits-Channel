@@ -41,3 +41,9 @@ def test_empirical_terminal_keeps_mmf_out_of_core_dropna_path() -> None:
     content = Path("src/app.py").read_text()
     assert 'core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]' in content
     assert "data = data_full[core_empirical_cols].dropna().copy()" in content
+
+
+def test_empirical_terminal_drops_missing_factor_rows_before_regressions() -> None:
+    content = Path("src/app.py").read_text()
+    assert 'required_empirical_factors = ["d_ff", "r_kbe", "r_iat", "r_spy"]' in content
+    assert "data = data.dropna(subset=required_empirical_factors)" in content

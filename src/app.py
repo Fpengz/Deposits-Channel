@@ -379,6 +379,7 @@ with tab2:
             st.warning("Selected timeframe has no data overlap.")
         else:
             core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]
+            required_empirical_factors = ["d_ff", "r_kbe", "r_iat", "r_spy"]
             data_full["d_ff"] = data_full["FF_Proxy"].diff()
             data_full["r_kbe"] = data_full["KBE"].pct_change()
             data_full["r_iat"] = data_full["IAT"].pct_change()
@@ -388,6 +389,7 @@ with tab2:
             data["r_kbe"] = data_full.loc[data.index, "r_kbe"]
             data["r_iat"] = data_full.loc[data.index, "r_iat"]
             data["r_spy"] = data_full.loc[data.index, "r_spy"]
+            data = data.dropna(subset=required_empirical_factors)
 
             # Q1. Market Evolution
             st.subheader("Q1: Are banks sensitive to rate shocks?")
