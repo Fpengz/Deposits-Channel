@@ -92,7 +92,7 @@ def _build_recent_stress_series(frame: pd.DataFrame) -> pd.Series:
             recent["d_ff"],
             recent["r_vix"],
             recent["KBE"],
-            window=min(lookback, len(recent)),
+            window=min(5, len(recent)),
             smoothing=min(5, len(recent)),
         ).dropna()
         if not stress_series.empty:
@@ -125,7 +125,11 @@ def _recent_change(series: pd.Series) -> tuple[float, int]:
         first = recent.iloc[0]
         last = recent.iloc[-1]
         if pd.notna(first) and pd.notna(last) and first != 0:
-            return last / first - 1, len(recent)
+            if isinstance(recent.index, pd.DatetimeIndex):
+                horizon = (recent.index[-1] - recent.index[0]).days
+            else:
+                horizon = len(recent)
+            return last / first - 1, horizon
     return np.nan, 0
 
 

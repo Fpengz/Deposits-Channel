@@ -175,14 +175,14 @@ def test_build_recent_stress_series_can_populate_with_short_fallback_history() -
         smoothing: int = 5,
     ) -> pd.Series:
         calls.append((len(d_ff), window, smoothing))
-        if len(d_ff) >= window + smoothing - 1:
+        if len(d_ff) >= 10 and window == 5 and smoothing == 5:
             return pd.Series([np.nan] * (len(d_ff) - 1) + [1.0], index=d_ff.index)
         return pd.Series(dtype=float, index=d_ff.index)
 
     build_recent_stress_series = _load_app_helper(
         "_build_recent_stress_series", {"build_stress_index": fake_build_stress_index}
     )
-    index = pd.date_range("2024-01-01", periods=30, freq="D")
+    index = pd.date_range("2024-01-01", periods=10, freq="D")
     frame = pd.DataFrame(
         {
             "d_ff": np.linspace(0.0, 1.0, len(index)),
@@ -196,17 +196,20 @@ def test_build_recent_stress_series_can_populate_with_short_fallback_history() -
 
     assert not result.empty
     assert result.iloc[-1] == 1.0
-    assert any(length > window for length, window, _ in calls)
+    assert any(length == 10 and window == 5 for length, window, _ in calls)
 
 
 def test_recent_change_reports_actual_horizon_used_in_ui_labels() -> None:
     recent_change = _load_app_helper("_recent_change")
-    series = pd.Series(np.linspace(100.0, 114.0, 15))
+    series = pd.Series(
+        np.linspace(100.0, 114.0, 5),
+        index=pd.date_range("2024-01-01", periods=5, freq="D"),
+    )
 
     change, horizon = recent_change(series)
     content = APP_SOURCE.read_text()
 
-    assert horizon == 15
+    assert horizon == 4
     assert change == pytest.approx(0.14)
     assert 'mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"' in content
     assert 'credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"' in content
