@@ -5,6 +5,7 @@ description = "Interactive dashboard for the Deposits Channel of Monetary Policy
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy>=2.2.0",
     "streamlit>=1.32.0",
     "pandas>=2.2.0",
     "plotly>=5.19.0",
@@ -14,9 +15,47 @@ dependencies = [
     "watchdog>=6.0.0",
 ]
 
-[project.optional-dependencies]
+[project.scripts]
+app = "src.cli:app"
+check = "src.cli:check"
+fix = "src.cli:fix"
+format = "src.cli:format_cmd"
+hooks = "src.cli:hooks"
+lint = "src.cli:lint"
+paper = "src.cli:paper"
+paper-watch = "src.cli:paper_watch"
+test = "src.cli:test"
+typecheck = "src.cli:typecheck"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
 dev = [
+    "pre-commit>=4.5.1",
     "pytest>=8.0.0",
-    "black>=24.0.0",
-    "isort>=5.13.0",
+    "ruff>=0.15.10",
+    "ty>=0.0.29",
 ]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
