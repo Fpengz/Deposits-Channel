@@ -14,6 +14,7 @@ from src.analysis import (
     calculate_returns,
     calculate_rolling_beta,
     check_stationarity,
+    classify_channel_state,
     detect_monetary_regimes,
     estimate_var_forecast,
     event_study_car,
@@ -204,3 +205,12 @@ def test_build_beta_heatmap_returns_figure():
     beta_df = pd.DataFrame({"KBE": [0.1, -0.2, 0.05], "IAT": [0.0, 0.3, -0.1]}, index=idx)
     fig = build_beta_heatmap(beta_df)
     assert isinstance(fig, go.Figure)
+
+
+def test_classify_channel_state():
+    state = classify_channel_state(
+        stress_value=1.9,
+        bank_beta=-0.8,
+        mmf_relative=-0.12,
+    )
+    assert state == "Stressed"

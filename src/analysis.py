@@ -264,6 +264,18 @@ def calculate_cross_correlation(s1: pd.Series, s2: pd.Series, max_lag: int = 15)
     return list(lags), list(coeffs)
 
 
+def classify_channel_state(
+    stress_value: float,
+    bank_beta: float,
+    mmf_relative: float,
+) -> str:
+    if stress_value >= 1.5 or (bank_beta < -0.5 and mmf_relative < -0.05):
+        return "Stressed"
+    if stress_value >= 0.75 or bank_beta < -0.2 or mmf_relative < -0.02:
+        return "Active"
+    return "Dormant"
+
+
 def detect_monetary_regimes(ff_series: pd.Series, window: int = 20) -> pd.Series:
     """Detects 'Hiking' vs 'Easing' regimes based on a rolling average of proxy changes."""
     # Smoothed change to avoid noise
