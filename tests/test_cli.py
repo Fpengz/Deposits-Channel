@@ -180,6 +180,18 @@ def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> Non
     assert "if data.empty:" in content
 
 
+def test_guided_entry_orientation_anchors_present() -> None:
+    content = Path("src/app.py").read_text()
+
+    for marker in [
+        "How to read this terminal",
+        "Question:",
+        "Use this when:",
+        "Start here:",
+    ]:
+        assert marker in content
+
+
 def test_macro_regime_matrix_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Regime Matrix" in content
