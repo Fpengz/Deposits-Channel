@@ -41,6 +41,38 @@ def _extract_tab_block(source: str, tab_name: str) -> str:
     raise AssertionError(f"Could not find block for {tab_name}")
 
 
+def _extract_tab_nodes(source: str, tab_name: str) -> list[ast.With]:
+    module = ast.parse(source)
+    nodes: list[ast.With] = []
+    for node in module.body:
+        if isinstance(node, ast.With):
+            for item in node.items:
+                expr = item.context_expr
+                if isinstance(expr, ast.Name) and expr.id == tab_name:
+                    nodes.append(node)
+    if nodes:
+        return nodes
+    raise AssertionError(f"Could not find node for {tab_name}")
+
+
+def _call_name(call: ast.Call) -> str | None:
+    func = call.func
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _tab_call_nodes(source: str, tab_name: str, func_name: str) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+    for node in _extract_tab_nodes(source, tab_name):
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call) and _call_name(child) == func_name:
+                calls.append(child)
+    return calls
+
+
 def test_build_app_command() -> None:
     command = cli.build_command("app", ["--server.headless", "true"])
 
@@ -69,11 +101,12 @@ def test_theory_tab_story_labels_present() -> None:
 
     assert "Theory & Simulation" in theory_block
     assert "Q1: What is the deposits channel mechanism?" in theory_block
-    assert "**Short answer:**" in theory_block
+    assert "render_research_module_intro(" in theory_block
+    assert "render_takeaway_block(" in theory_block
+    assert "**Short answer:**" not in theory_block
     assert "By the end of this section" in theory_block
     assert "Q5: When do outflows and AOCI become destabilizing?" in theory_block
     assert "**What to notice:**" in theory_block
-    assert "**Takeaway:**" in theory_block
 
 
 def test_research_seminar_spine_labels_and_tabs_present() -> None:
@@ -102,7 +135,9 @@ def test_empirical_terminal_reads_like_research_seminar() -> None:
     content = Path("src/app.py").read_text()
     empirical_block = _extract_tab_block(content, "tab2")
 
-    assert "**Short answer:**" in empirical_block
+    assert "render_research_module_intro(" in empirical_block
+    assert "render_takeaway_block(" in empirical_block
+    assert "**Short answer:**" not in empirical_block
     assert "research seminar" in empirical_block
     assert "signal board" in empirical_block
 
@@ -114,7 +149,7 @@ def test_empirical_terminal_reads_like_research_seminar() -> None:
         "Q3: Do policy events create abnormal returns?",
         "Q5: Does fear amplify the channel?",
         "Q6: How do shocks propagate over time?",
-        "Takeaway",
+        "render_takeaway_block(",
     ]
     positions = [empirical_block.index(marker) for marker in ordered_markers]
     assert positions == sorted(positions)
@@ -156,7 +191,9 @@ def test_macro_tab_uses_flow_of_funds_seminar_framing() -> None:
     macro_block = _extract_tab_block(content, "tab3")
 
     assert "Trace proxy evidence" in macro_block
-    assert "**Short answer:**" in macro_block
+    assert "render_research_module_intro(" in macro_block
+    assert "render_takeaway_block(" in macro_block
+    assert "**Short answer:**" not in macro_block
     assert "proxy-based" in macro_block
     assert "interpretive" in macro_block
     assert "downstream pressure" in macro_block
@@ -178,7 +215,9 @@ def test_case_study_uses_narrative_arc_framing() -> None:
     case_block = _extract_tab_block(content, "tab4")
 
     assert "March 2023 Banking Stress" in case_block
-    assert "**Short answer:**" in case_block
+    assert "render_research_module_intro(" in case_block
+    assert "render_takeaway_block(" in case_block
+    assert "**Short answer:**" not in case_block
     for marker in [
         "preconditions",
         "break",
@@ -186,7 +225,7 @@ def test_case_study_uses_narrative_arc_framing() -> None:
         "counterfactual repair",
     ]:
         assert marker in case_block
-    assert "what would have changed the outcome" in case_block
+    assert "duration, stickiness, or concentration" in case_block
 
 
 def test_monitoring_tab_present() -> None:
@@ -199,7 +238,9 @@ def test_monitoring_tab_reads_like_the_seminar_close() -> None:
     monitoring_block = _extract_tab_block(content, "tab5")
 
     assert "Monitoring & Scenarios" in monitoring_block
-    assert "**Short answer:**" in monitoring_block
+    assert "render_research_module_intro(" in monitoring_block
+    assert "render_takeaway_block(" in monitoring_block
+    assert "**Short answer:**" not in monitoring_block
     assert "scorecard" in monitoring_block.lower()
     assert "If this, then that playbook" in monitoring_block
     assert "audience takeaways" in monitoring_block.lower()
@@ -215,12 +256,27 @@ def test_editorial_consistency_keeps_seminar_anchors_balanced() -> None:
     content = APP_SOURCE.read_text()
     monitoring_block = _extract_tab_block(content, "tab5")
 
-    assert monitoring_block.count("**Short answer:**") >= 1
     assert monitoring_block.count("**What to notice:**") >= 1
     assert "Audience Takeaways" in monitoring_block
-    assert "**Short answer:**" in monitoring_block
     assert "**What to notice:**" in monitoring_block
-    assert "**Takeaway:**" in monitoring_block
+    assert "render_takeaway_block(" in monitoring_block
+
+
+def test_tabs_adopt_research_modules_takeaways_and_wrapped_diagnostics() -> None:
+    content = APP_SOURCE.read_text()
+
+    for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
+        block = _extract_tab_block(content, tab_name)
+        assert "render_research_module_intro(" in block
+        assert "render_takeaway_block(" in block
+        assert "**Short answer:**" not in block
+
+    for tab_name in ["tab1", "tab2", "tab5"]:
+        diagnostic_calls = _tab_call_nodes(content, tab_name, "render_diagnostic_band")
+        assert diagnostic_calls
+        assert any(
+            any(keyword.arg == "body" for keyword in call.keywords) for call in diagnostic_calls
+        )
 
 
 def test_monitoring_tab_matches_planned_structure() -> None:
@@ -378,20 +434,33 @@ def test_visual_system_helpers_render_semantic_html() -> None:
         def markdown(self, body: str, unsafe_allow_html: bool = False) -> None:
             calls.append((body, unsafe_allow_html))
 
+    fake_streamlit = FakeStreamlit()
     render_seminar_banner = _load_app_helper(
-        "render_seminar_banner", {"st": FakeStreamlit(), "html": html}
+        "render_seminar_banner", {"st": fake_streamlit, "html": html}
     )
     render_diagnostic_band = _load_app_helper(
-        "render_diagnostic_band", {"st": FakeStreamlit(), "html": html}
+        "render_diagnostic_band", {"st": fake_streamlit, "html": html}
+    )
+    render_takeaway_block = _load_app_helper(
+        "render_takeaway_block", {"st": fake_streamlit, "html": html}
     )
 
     render_seminar_banner("Open <session>", "Framing & synthesis", "Answer <yes>")
-    render_diagnostic_band("Board", "Track the live read", "Use the scorecard first")
+    render_diagnostic_band(
+        "Board",
+        "Track the live read",
+        "Use the scorecard first",
+        body=lambda: fake_streamlit.markdown("<span>metric surface</span>", unsafe_allow_html=True),
+    )
+    render_takeaway_block("Lead with the surface <scan> before the narrative.")
 
-    assert len(calls) == 2
+    assert len(calls) == 5
 
     banner_body, banner_allow_html = calls[0]
     band_body, band_allow_html = calls[1]
+    wrapped_surface_body, wrapped_surface_allow_html = calls[2]
+    band_close_body, band_close_allow_html = calls[3]
+    takeaway_body, takeaway_allow_html = calls[4]
 
     assert banner_allow_html is True
     assert '<div class="seminar-banner">' in banner_body
@@ -406,6 +475,17 @@ def test_visual_system_helpers_render_semantic_html() -> None:
     assert "Board" in band_body
     assert "Track the live read" in band_body
     assert "<strong>Diagnostic note:</strong> Use the scorecard first" in band_body
+
+    assert wrapped_surface_allow_html is True
+    assert wrapped_surface_body == "<span>metric surface</span>"
+
+    assert band_close_allow_html is True
+    assert band_close_body == "</div>"
+
+    assert takeaway_allow_html is True
+    assert '<div class="takeaway-block">' in takeaway_body
+    assert "Lead with the surface &lt;scan&gt; before the narrative." in takeaway_body
+    assert "<strong>Takeaway:</strong>" in takeaway_body
 
 
 def test_tabs_use_seminar_banners_and_diagnostic_bands() -> None:

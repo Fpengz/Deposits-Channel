@@ -1,5 +1,6 @@
 import html
 import warnings
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -164,12 +165,31 @@ def render_seminar_banner(title: str, framing: str, short_answer: str) -> None:
     )
 
 
-def render_diagnostic_band(title: str, summary: str, note: str | None = None) -> None:
+def render_diagnostic_band(
+    title: str,
+    summary: str,
+    note: str | None = None,
+    body: Callable[[], None] | None = None,
+) -> None:
     note_html = (
         f'<p class="short-answer"><strong>Diagnostic note:</strong> {html.escape(note)}</p>'
         if note
         else ""
     )
+    if body is None:
+        st.markdown(
+            f"""
+            <div class="diagnostic-band">
+              <div class="module-kicker">Diagnostic Band</div>
+              <h3>{html.escape(title)}</h3>
+              <p>{html.escape(summary)}</p>
+              {note_html}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     st.markdown(
         f"""
         <div class="diagnostic-band">
@@ -177,10 +197,11 @@ def render_diagnostic_band(title: str, summary: str, note: str | None = None) ->
           <h3>{html.escape(title)}</h3>
           <p>{html.escape(summary)}</p>
           {note_html}
-        </div>
         """,
         unsafe_allow_html=True,
     )
+    body()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_research_module_intro(title: str, why_it_matters: str) -> None:
@@ -300,17 +321,18 @@ with tab1:
         "Policy tightening matters when banks can keep deposit rates sticky while alternatives become more attractive.",
     )
     st.markdown(
-        "**Short answer:** policy tightening matters when banks can keep deposit rates sticky while alternative cash vehicles become more attractive."
+        "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
     )
+
     render_diagnostic_band(
         "Opening diagnostic",
         "The first read is the gap between rates, deposit pricing, and volume before the scenario surface expands.",
-        "The metric row below is the first live check on funding pressure and capital strain.",
+        "The core metric band later in the tab turns that framing into live funding-pressure numbers.",
     )
-    st.markdown(
-        "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
+    render_research_module_intro(
+        "Q1: What is the deposits channel mechanism?",
+        "This opening module states the mechanism clearly before the simulation turns it into visible pass-through and balance-sheet pressure.",
     )
-    st.subheader("Q1: What is the deposits channel mechanism?")
     st.markdown(
         "By the end of this section, the reader should know which assumptions make the system fragile and why."
     )
@@ -362,27 +384,33 @@ with tab1:
         bond_portfolio_ratio=0.6,
     )
 
+    render_research_module_intro(
+        "Q2: How sensitive is the mechanism to assumptions?",
+        "This module tests whether market power and depositor elasticity make the same rate shock bite harder or softer.",
+    )
+
+    def render_core_metric_surface() -> None:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Fed Funds Rate", f"{fed_funds_rate * 100:.2f}%")
+        col2.metric("Deposit Rate", f"{dep_rate * 100:.2f}%", f"-{spread * 100:.2f}% spread")
+        col3.metric("Total Deposits", f"${volume:,.0f}B")
+        col4.metric(
+            "Capital Buffer (Proxy)",
+            f"{liquidity_proxy:.1f}%",
+            f"${bond_loss:,.0f}B Unrealized Loss",
+            delta_color="inverse",
+        )
+
+        st.info(
+            "The **Capital Buffer Proxy** shows the dual squeeze: Deposit outflows + bond portfolio losses (AOCI)."
+        )
+
     render_diagnostic_band(
         "Core metric band",
         "This row condenses the live simulation into a quick read on policy, deposits, and the balance-sheet buffer.",
         "Use it as the opening diagnostic before the scenario charts deepen the evidence.",
+        body=render_core_metric_surface,
     )
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Fed Funds Rate", f"{fed_funds_rate * 100:.2f}%")
-    col2.metric("Deposit Rate", f"{dep_rate * 100:.2f}%", f"-{spread * 100:.2f}% spread")
-    col3.metric("Total Deposits", f"${volume:,.0f}B")
-    col4.metric(
-        "Capital Buffer (Proxy)",
-        f"{liquidity_proxy:.1f}%",
-        f"${bond_loss:,.0f}B Unrealized Loss",
-        delta_color="inverse",
-    )
-
-    st.info(
-        "The **Capital Buffer Proxy** shows the dual squeeze: Deposit outflows + bond portfolio losses (AOCI)."
-    )
-
-    st.subheader("Q2: How sensitive is the mechanism to assumptions?")
     st.markdown(
         "This pass-through step varies market power and depositor elasticity to see where spreads bite most."
     )
@@ -509,7 +537,10 @@ with tab1:
         "**What to notice:** concentrated banks sit farther below full pass-through, so the policy shock is absorbed by depositors unevenly."
     )
 
-    st.subheader("Q3: What happens under plausible rate paths?")
+    render_research_module_intro(
+        "Q3: What happens under plausible rate paths?",
+        "The path simulation shows that identical starting conditions can diverge quickly once rates and elasticity move together.",
+    )
     st.markdown(
         "Now we move to deposit sensitivity: nine simulated paths map policy uncertainty into funding outcomes."
     )
@@ -541,7 +572,10 @@ with tab1:
         "**What to notice:** the same rate path can produce very different deposit trajectories once elasticity shifts the curve's steepness."
     )
 
-    st.subheader("Q4: How do rate changes impact AOCI?")
+    render_research_module_intro(
+        "Q4: How do rate changes impact AOCI?",
+        "Duration losses are the bridge between rates and capital; this module shows when mark-to-market pain arrives before deposits visibly run.",
+    )
     st.markdown(
         "The scenario step adds duration risk, translating rate changes into unrealized losses on bank bond portfolios."
     )
@@ -564,7 +598,10 @@ with tab1:
         "**What to notice:** rate-path scenarios matter because bond losses can arrive even before deposit outflows fully show up."
     )
 
-    st.subheader("Q5: When do outflows and AOCI become destabilizing?")
+    render_research_module_intro(
+        "Q5: When do outflows and AOCI become destabilizing?",
+        "This threshold view shows how the channel tips from friction into stress once runoff and duration losses compound.",
+    )
     st.markdown(
         "This is the destabilization threshold: outflow pressure becomes more dangerous when unrealized bond losses are already eating into capital. "
         "The grid marks the zone where deposit runoff and AOCI losses combine into a stress pocket."
@@ -589,8 +626,8 @@ with tab1:
     st.markdown(
         "**What to notice:** Once both pressures build together, the safe region disappears quickly."
     )
-    st.markdown(
-        "**Takeaway:** the channel becomes dangerous when partial pass-through, high elasticity, and duration losses line up at the same time."
+    render_takeaway_block(
+        "The channel becomes dangerous when partial pass-through, high elasticity, and duration losses line up at the same time."
     )
 
 with tab2:
@@ -599,9 +636,6 @@ with tab2:
         "Open with the signal board, then move from regime identification into event evidence, fear amplification, and propagation.",
         "The deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up.",
     )
-    st.markdown(
-        "**Short answer:** the deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up; the rest of the section checks whether that pattern behaves like a regime, a policy-event response, a fear amplifier, or a propagation channel."
-    )
     render_diagnostic_band(
         "Empirical opening",
         "This tab starts with the live diagnostic question: are rate sensitivity and stress lining up into a channel regime?",
@@ -609,9 +643,6 @@ with tab2:
     )
     st.markdown(
         "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
-    )
-    st.markdown(
-        "**Short answer:** the deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up; the rest of the section checks whether that pattern behaves like a regime, a policy-event response, a fear amplifier, or a propagation channel."
     )
     st.markdown(
         "Each section asks a market question, then answers it with data, with transitions that follow the evidence from the signal board to the downstream tests."
@@ -662,6 +693,10 @@ with tab2:
                 )
             else:
                 # Q1. Market Evolution
+                render_research_module_intro(
+                    "Q1: Are banks sensitive to rate shocks?",
+                    "The first empirical module checks whether bank returns actually move with rate shocks before we interpret any regime story.",
+                )
                 st.subheader("Q1: Are banks sensitive to rate shocks?")
                 st.markdown("We compare rate changes to bank and market performance.")
                 fig_ts = go.Figure()
@@ -706,14 +741,27 @@ with tab2:
                 st.subheader("Q1: Interest Rate Betas")
                 res_kbe = run_ols_regression(data, "r_kbe", "d_ff")
                 res_spy = run_ols_regression(data, "r_spy", "d_ff")
-                col1, col2 = st.columns(2)
-                col1.metric("Bank Beta", f"{res_kbe.params['d_ff']:.4f}")
-                col2.metric("Market Beta", f"{res_spy.params['d_ff']:.4f}")
-                st.caption(
-                    "Lower (more negative) Beta means the sector is more sensitive to rate hikes. Banks typically show higher sensitivity."
+
+                def render_rate_beta_surface() -> None:
+                    col1, col2 = st.columns(2)
+                    col1.metric("Bank Beta", f"{res_kbe.params['d_ff']:.4f}")
+                    col2.metric("Market Beta", f"{res_spy.params['d_ff']:.4f}")
+                    st.caption(
+                        "Lower (more negative) Beta means the sector is more sensitive to rate hikes. Banks typically show higher sensitivity."
+                    )
+
+                render_diagnostic_band(
+                    "Interest rate betas",
+                    "This live read compares the bank and market response to rate shocks before the regime test zooms in.",
+                    "The beta pair is the empirical surface, not just a lead-in sentence.",
+                    body=render_rate_beta_surface,
                 )
 
                 # Q4. Sensitivity Stability
+                render_research_module_intro(
+                    "Q4: Is sensitivity stable over time?",
+                    "Recursive betas check whether rate exposure drifts as the market moves between calmer and more stressed periods.",
+                )
                 st.subheader("Q4: Is sensitivity stable over time?")
                 st.markdown("Recursive betas show whether rate exposure drifts through regimes.")
                 betas, se = calculate_recursive_ols(data, "r_kbe", "d_ff")
@@ -749,6 +797,10 @@ with tab2:
                 st.plotly_chart(fig_rec, width="stretch")
 
                 # Q2. Stress Signal
+                render_research_module_intro(
+                    "Q2: Is stress building in the system?",
+                    "This module tests whether rates, volatility, and bank drawdowns are already accumulating into a channel-wide signal.",
+                )
                 st.subheader("Q2: Is stress building in the system?")
                 st.markdown(
                     "We combine rate shocks, volatility, and bank drawdowns into one signal, then use that signal to anchor the rest of the seminar."
@@ -794,22 +846,28 @@ with tab2:
                         mmf_relative,
                     )
 
-                    st.subheader("Signal Board")
-                    st.markdown(
-                        "With the board in hand, the next question is whether the channel is merely active or fully in a transmission regime."
-                    )
-                    board_col1, board_col2, board_col3 = st.columns(3)
-                    board_col1.metric("Channel State", channel_state)
-                    board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
-                    board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
-                    st.caption(
-                        "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
-                    )
+                    def render_signal_board_surface() -> None:
+                        st.subheader("Signal Board")
+                        st.markdown(
+                            "With the board in hand, the next question is whether the channel is merely active or fully in a transmission regime."
+                        )
+                        board_col1, board_col2, board_col3 = st.columns(3)
+                        board_col1.metric("Channel State", channel_state)
+                        board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
+                        board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
+                        st.caption(
+                            "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
+                        )
 
                     render_diagnostic_band(
                         "Signal board",
                         "The latest stress, beta, and relative performance summary gives the first regime read before the event tests continue.",
                         "When the board turns more active, the seminar shifts from description to transmission evidence.",
+                        body=render_signal_board_surface,
+                    )
+                    render_research_module_intro(
+                        "Q8: Which regime are we in?",
+                        "This summary translates the signal board into a regime label before the downstream event and propagation evidence continue.",
                     )
                     st.subheader("Q8: Which regime are we in?")
                     if channel_state == "Stressed":
@@ -837,6 +895,10 @@ with tab2:
                     )
 
                 # Q3. Policy Event Impact
+                render_research_module_intro(
+                    "Q3: Do policy events create abnormal returns?",
+                    "Event studies test whether FOMC dates produce footprints that are different from ordinary market noise.",
+                )
                 st.subheader("Q3: Do policy events create abnormal returns?")
                 st.markdown("We average cumulative abnormal returns around FOMC dates.")
                 event_dates = [
@@ -889,6 +951,10 @@ with tab2:
                     st.plotly_chart(fig_beta, width="stretch")
 
                 # Q5. Fear Amplification
+                render_research_module_intro(
+                    "Q5: Does fear amplify the channel?",
+                    "This split asks whether volatility makes the same rate shock more potent for bank returns.",
+                )
                 st.subheader("Q5: Does fear amplify the channel?")
                 st.markdown(
                     "We split betas by high vs low VIX to test whether market fear makes the channel materially stronger."
@@ -900,17 +966,29 @@ with tab2:
                     res_high = run_ols_regression(high_vix, "r_kbe", "d_ff")
                     res_low = run_ols_regression(low_vix, "r_kbe", "d_ff")
 
-                    col1, col2 = st.columns(2)
-                    col1.metric("Beta (VIX > 20)", f"{res_high.params['d_ff']:.4f}")
-                    col2.metric("Beta (VIX <= 20)", f"{res_low.params['d_ff']:.4f}")
-                    st.caption(
-                        "A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress."
+                    def render_fear_split_surface() -> None:
+                        col1, col2 = st.columns(2)
+                        col1.metric("Beta (VIX > 20)", f"{res_high.params['d_ff']:.4f}")
+                        col2.metric("Beta (VIX <= 20)", f"{res_low.params['d_ff']:.4f}")
+                        st.caption(
+                            "A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress."
+                        )
+
+                    render_diagnostic_band(
+                        "Fear split",
+                        "This surface compares high- and low-volatility beta estimates before the propagation test takes over.",
+                        "The split is the diagnostic surface, not just a transition sentence.",
+                        body=render_fear_split_surface,
                     )
                     st.markdown(
                         "The fear split closes the event test by showing whether stress changes the strength of the same rate response."
                     )
 
                 # Q6. Shock Propagation
+                render_research_module_intro(
+                    "Q6: How do shocks propagate over time?",
+                    "Impulse responses show whether the channel diffuses quickly or keeps working through the system over multiple days.",
+                )
                 st.subheader("Q6: How do shocks propagate over time?")
                 st.markdown(
                     "Impulse responses trace the shock ripple over the next 20 trading days, letting us see how quickly the channel travels through the system."
@@ -948,6 +1026,10 @@ with tab2:
 
                 # Q7. Co-movement
                 st.divider()
+                render_research_module_intro(
+                    "Q7: How do the variables co-move?",
+                    "The correlation surface checks whether the system behaves as a connected channel or as a set of unrelated indicators.",
+                )
                 st.subheader("Q7: How do the variables co-move?")
                 corr = calculate_correlation_matrix(
                     data[["d_ff", "r_kbe", "r_iat", "r_spy", "r_vix"]].dropna()
@@ -962,9 +1044,8 @@ with tab2:
                     width="stretch",
                 )
 
-                st.subheader("Takeaway")
-                st.markdown(
-                    "**Empirically, bank sensitivity to rates spikes in stress regimes and clusters around policy events.**"
+                render_takeaway_block(
+                    "Bank sensitivity to rates spikes in stress regimes and clusters around policy events."
                 )
 
 with tab3:
@@ -972,9 +1053,6 @@ with tab3:
         "Macro & Credit",
         "Trace proxy evidence from deposits into the broader macro and credit system, then interpret the downstream pressure through the curve and credit lens.",
         "The deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive.",
-    )
-    st.markdown(
-        "**Short answer:** the section traces proxy evidence suggesting pressure moves from deposits toward MMFs, then shows how the curve and credit read-throughs may reflect downstream stress; the deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive."
     )
     render_diagnostic_band(
         "Macro opening",
@@ -999,6 +1077,10 @@ with tab3:
         ]
 
         # Q1. Deposit Destination
+        render_research_module_intro(
+            "Q1: Where do deposits go when spreads widen?",
+            "The first macro module asks whether deposit migration is visible in the bank-versus-MMF proxy relationship.",
+        )
         st.subheader("Q1: Where do deposits go when spreads widen?")
         st.markdown(
             "We proxy flows by comparing bank equities to money market funds; this is the observable stand-in for deposit migration, not a literal flow measure."
@@ -1035,6 +1117,10 @@ with tab3:
         st.plotly_chart(fig_rel, width="stretch")
 
         # Q2. Macro Regime
+        render_research_module_intro(
+            "Q2: What macro regime are we in?",
+            "The curve regime anchors the macro story by showing whether the funding backdrop is normal, squeezed, or under stress.",
+        )
         st.subheader("Q2: What macro regime are we in?")
         st.markdown("The channel strains when the curve is flat or inverted.")
         macro_data["Slope"] = calculate_yield_curve_slope(
@@ -1087,14 +1173,13 @@ with tab3:
         st.markdown(
             "What to notice: the regime turns dangerous when curve compression and credit deterioration happen together."
         )
-        st.markdown(
-            "**Research takeaway:** The regime matrix links rates, flows, and credit into one narrative state."
+        render_takeaway_block(
+            "The regime matrix links rates, flows, and credit into one narrative state."
         )
+        st.subheader("Audience Takeaways")
         st.markdown(
-            "**Investor takeaway:** The move from Squeeze to Stress is where bank equity downside typically accelerates."
-        )
-        st.markdown(
-            "**Policy/risk takeaway:** Crisis conditions call for tighter liquidity surveillance and faster confidence backstops."
+            "- Investors: the move from Squeeze to Stress is where bank equity downside typically accelerates.\n"
+            "- Policy/risk users: crisis conditions call for tighter liquidity surveillance and faster confidence backstops."
         )
         st.markdown(
             "The credit section below is a downstream consequence of this earlier flow-of-funds story: once deposits leak toward MMFs and the curve compresses, credit conditions usually tighten afterward."
@@ -1102,6 +1187,10 @@ with tab3:
 
 with tab3:
     st.divider()
+    render_research_module_intro(
+        "Q3: Is credit stress feeding back into banks?",
+        "Credit stress closes the loop by testing whether downstream pressure is showing up in bank returns.",
+    )
     st.subheader("Q3: Is credit stress feeding back into banks?")
     st.markdown("We compare daily credit stress moves to bank returns.")
 
@@ -1197,9 +1286,8 @@ with tab3:
             )
             st.plotly_chart(fig_lag, width="stretch")
 
-        st.subheader("Takeaway")
-        st.markdown(
-            "**When rates rise, deposits shift toward MMFs, the curve compresses, and credit stress feeds back into bank equity.**"
+        render_takeaway_block(
+            "When rates rise, deposits shift toward MMFs, the curve compresses, and credit stress feeds back into bank equity."
         )
 
 with tab4:
@@ -1207,9 +1295,6 @@ with tab4:
         "Case Study: March 2023 Banking Stress",
         "Work through preconditions, break, market interpretation, and counterfactual repair as a compact narrative arc.",
         "March 2023 broke when rate-sensitive funding met unrealized losses and the market treated the move as a confidence event.",
-    )
-    st.markdown(
-        "**Short answer:** March 2023 broke when rate-sensitive funding met unrealized losses, the market interpreted the move as a confidence event, and the counterfactuals ask what would have changed the outcome."
     )
     render_diagnostic_band(
         "Case opening",
@@ -1233,6 +1318,10 @@ with tab4:
         crisis_data = merged[(merged.index >= crisis_start) & (merged.index <= crisis_end)]
 
         if not crisis_data.empty:
+            render_research_module_intro(
+                "Q1: What conditions preceded the break?",
+                "This opening module frames the crisis as a balance-sheet setup, not a one-day surprise.",
+            )
             st.subheader("Q1: Preconditions -> Break")
             st.markdown(
                 "The preconditions were rate pressure, large unrealized bond losses, and a funding base that could not absorb fast deposit outflows."
@@ -1281,6 +1370,10 @@ with tab4:
               further increasing their market power.
             """)
 
+            render_research_module_intro(
+                "Q2: How did the market interpret the break?",
+                "This module shows how the selloff and divergence turned a balance-sheet event into a confidence story.",
+            )
             st.subheader("Q2: Market interpretation")
             st.markdown("Normalize KBE and IAT to visualize cumulative separation.")
             kbe_norm = crisis_data["KBE"] / crisis_data["KBE"].iloc[0]
@@ -1299,6 +1392,10 @@ with tab4:
             )
             st.plotly_chart(fig_div, width="stretch")
 
+            render_research_module_intro(
+                "Q3: How does market interpretation map back to channel mechanics?",
+                "The waterfall turns the narrative back into mechanics by decomposing the visible damage into deposits, AOCI, and equity divergence.",
+            )
             st.subheader("Q3: Market interpretation -> channel mechanics")
             st.markdown(
                 "An illustrative waterfall decomposes the impact into deposits, AOCI, and equity divergence."
@@ -1331,6 +1428,10 @@ with tab4:
                 "**Waterfall framing:** the damage compounded in sequence as deposit flight exposed bond losses and then widened the equity penalty for regionals."
             )
 
+            render_research_module_intro(
+                "Q4: What would have changed the outcome?",
+                "The counterfactuals test whether the crisis was mostly about duration, stickiness, or concentration.",
+            )
             st.subheader("Q4: Counterfactual repair")
             st.markdown(
                 "We run simple counterfactuals to show which balance-sheet choices would have changed the outcome, not just softened the optics after the fact."
@@ -1360,24 +1461,24 @@ with tab4:
                 "**What to notice:** lower duration would have reduced mark-to-market losses, stickier deposits would have slowed the run, and a less concentrated system would have weakened the feedback loop."
             )
 
-            st.subheader("Takeaway")
-            st.markdown(
-                "**The 2023 episode shows how fast liquidity outflows and AOCI losses can propagate into equity stress.**"
+            render_takeaway_block(
+                "The 2023 episode shows how fast liquidity outflows and AOCI losses can propagate into equity stress."
             )
+            st.subheader("Audience Takeaways")
             st.markdown(
-                "**Research takeaway:** March 2023 exposed where the canonical channel became nonlinear."
-            )
-            st.markdown(
-                "**Investor takeaway:** Large-bank resilience and regional fragility reflected very different funding narratives."
-            )
-            st.markdown(
-                "**Policy/risk takeaway:** Lower duration and more stable deposits are complementary crisis-mitigation levers."
+                "- Researchers: March 2023 exposed where the canonical channel became nonlinear.\n"
+                "- Investors: large-bank resilience and regional fragility reflected very different funding narratives.\n"
+                "- Policy/risk users: lower duration and more stable deposits are complementary crisis-mitigation levers."
             )
         else:
             st.warning("Crisis period data not available in current fetch.")
 
     # Re-add the Risk Test here or as an expander
     st.divider()
+    render_research_module_intro(
+        "Stress Test Simulation",
+        "The final check turns the crisis lesson into a Monte Carlo distribution of possible deposit outcomes.",
+    )
     st.subheader("Stress Test Simulation")
     if st.button("🚀 Run 1,000 Trial Stress Test"):
         trials = run_monte_carlo_simulation(fed_funds_rate, market_power, base_volume, elasticity)
@@ -1403,9 +1504,6 @@ with tab5:
         "Close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last.",
         "The five-metric scorecard is an opening diagnostic, not a verdict.",
     )
-    st.markdown(
-        "**Short answer:** the five-metric scorecard is an opening diagnostic, not a verdict; it tells you whether the channel is live enough to justify the scenarios and playbook that follow."
-    )
     render_diagnostic_band(
         "Monitoring opening",
         "The scorecard compresses stress, beta, curve, MMF pressure, and credit stress into one live reading before the scenarios and playbook.",
@@ -1421,102 +1519,115 @@ with tab5:
             & (merged.index <= pd.to_datetime(end_date))
         ].copy()
 
-    st.subheader("Signal Scorecard")
-    scorecard_col1, scorecard_col2, scorecard_col3, scorecard_col4, scorecard_col5 = st.columns(5)
-    stress_value = "N/A"
-    stress_delta = None
-    beta_value = "N/A"
-    beta_delta = None
-    curve_value = "N/A"
-    curve_delta = None
-    mmf_value = "N/A"
-    mmf_delta = None
-    credit_value = "N/A"
-    credit_delta = None
-
-    if monitoring_frame.empty:
-        scorecard_col1.metric("Stress composite", "N/A")
-        scorecard_col2.metric("Bank beta regime", "N/A")
-        scorecard_col3.metric("Curve regime", "N/A")
-        scorecard_col4.metric("MMF pressure", "N/A")
-        scorecard_col5.metric("Credit stress trend", "N/A")
-        st.markdown(
-            "**What to notice:** without overlapping market data, the scorecard cannot support a regime read, so the seminar close stays at the diagnostic stage."
+    def render_scorecard_surface() -> None:
+        st.subheader("Signal Scorecard")
+        scorecard_col1, scorecard_col2, scorecard_col3, scorecard_col4, scorecard_col5 = st.columns(
+            5
         )
-    else:
-        scorecard_frame = monitoring_frame.copy()
-        scorecard_frame["d_ff"] = scorecard_frame["FF_Proxy"].diff()
-        scorecard_frame["r_vix"] = calculate_returns(scorecard_frame["VIX"])
+        stress_value = "N/A"
+        stress_delta = None
+        beta_value = "N/A"
+        beta_delta = None
+        curve_value = "N/A"
+        curve_delta = None
+        mmf_value = "N/A"
+        mmf_delta = None
+        credit_value = "N/A"
+        credit_delta = None
 
-        stress_latest = _build_recent_stress_series(scorecard_frame)
-        if not stress_latest.empty:
-            latest_stress = stress_latest.iloc[-1]
-            stress_value = f"{latest_stress:.2f}"
-            stress_delta = "Elevated" if latest_stress >= 0.75 else "Normal"
+        if monitoring_frame.empty:
+            scorecard_col1.metric("Stress composite", "N/A")
+            scorecard_col2.metric("Bank beta regime", "N/A")
+            scorecard_col3.metric("Curve regime", "N/A")
+            scorecard_col4.metric("MMF pressure", "N/A")
+            scorecard_col5.metric("Credit stress trend", "N/A")
+            st.markdown(
+                "**What to notice:** without overlapping market data, the scorecard cannot support a regime read, so the seminar close stays at the diagnostic stage."
+            )
+        else:
+            scorecard_frame = monitoring_frame.copy()
+            scorecard_frame["d_ff"] = scorecard_frame["FF_Proxy"].diff()
+            scorecard_frame["r_vix"] = calculate_returns(scorecard_frame["VIX"])
 
-        beta_frame = scorecard_frame[["FF_Proxy", "KBE"]].copy()
-        beta_frame["r_kbe"] = beta_frame["KBE"].pct_change()
-        beta_frame["d_ff"] = beta_frame["FF_Proxy"].diff()
-        beta_frame = beta_frame.dropna()
-        latest_bank_beta, bank_beta_regime = _recent_beta_regime(beta_frame)
-        if latest_bank_beta is not None and bank_beta_regime is not None:
-            beta_value = bank_beta_regime
-            beta_delta = f"β={latest_bank_beta:.2f}"
+            stress_latest = _build_recent_stress_series(scorecard_frame)
+            if not stress_latest.empty:
+                latest_stress = stress_latest.iloc[-1]
+                stress_value = f"{latest_stress:.2f}"
+                stress_delta = "Elevated" if latest_stress >= 0.75 else "Normal"
 
-        curve_frame = pd.DataFrame()
-        if not ff_proxy.empty and not tnx_proxy.empty:
-            curve_frame = ff_proxy.join(tnx_proxy, lsuffix="_ff", rsuffix="_tnx").dropna()
-            curve_frame.columns = ["FF_Proxy", "Ten_Year"]
-            curve_frame = curve_frame[
-                (curve_frame.index >= pd.to_datetime(start_date))
-                & (curve_frame.index <= pd.to_datetime(end_date))
-            ].copy()
-            if not curve_frame.empty:
-                curve_slope = calculate_yield_curve_slope(
-                    curve_frame["Ten_Year"], curve_frame["FF_Proxy"]
-                )
-                curve_regimes = classify_curve_regime(curve_slope).dropna()
-                if not curve_regimes.empty:
-                    curve_value = curve_regimes.iloc[-1]
-                    curve_delta = f"10Y-3M={curve_slope.dropna().iloc[-1]:.2f}"
+            beta_frame = scorecard_frame[["FF_Proxy", "KBE"]].copy()
+            beta_frame["r_kbe"] = beta_frame["KBE"].pct_change()
+            beta_frame["d_ff"] = beta_frame["FF_Proxy"].diff()
+            beta_frame = beta_frame.dropna()
+            latest_bank_beta, bank_beta_regime = _recent_beta_regime(beta_frame)
+            if latest_bank_beta is not None and bank_beta_regime is not None:
+                beta_value = bank_beta_regime
+                beta_delta = f"β={latest_bank_beta:.2f}"
 
-        mmf_frame = pd.DataFrame()
-        if not ff_proxy.empty and not mmf_proxy.empty:
-            mmf_frame = ff_proxy.join(mmf_proxy, lsuffix="_ff", rsuffix="_mmf").dropna()
-            mmf_frame.columns = ["FF_Proxy", "MMF_Price"]
-            mmf_frame = mmf_frame[
-                (mmf_frame.index >= pd.to_datetime(start_date))
-                & (mmf_frame.index <= pd.to_datetime(end_date))
-            ].copy()
-            mmf_trend, mmf_horizon = _recent_change(mmf_frame["MMF_Price"])
-            if not np.isnan(mmf_trend):
-                mmf_value = "Pressure building" if mmf_trend > 0 else "Pressure easing"
-                mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"
+            curve_frame = pd.DataFrame()
+            if not ff_proxy.empty and not tnx_proxy.empty:
+                curve_frame = ff_proxy.join(tnx_proxy, lsuffix="_ff", rsuffix="_tnx").dropna()
+                curve_frame.columns = ["FF_Proxy", "Ten_Year"]
+                curve_frame = curve_frame[
+                    (curve_frame.index >= pd.to_datetime(start_date))
+                    & (curve_frame.index <= pd.to_datetime(end_date))
+                ].copy()
+                if not curve_frame.empty:
+                    curve_slope = calculate_yield_curve_slope(
+                        curve_frame["Ten_Year"], curve_frame["FF_Proxy"]
+                    )
+                    curve_regimes = classify_curve_regime(curve_slope).dropna()
+                    if not curve_regimes.empty:
+                        curve_value = curve_regimes.iloc[-1]
+                        curve_delta = f"10Y-3M={curve_slope.dropna().iloc[-1]:.2f}"
 
-        credit_frame = pd.DataFrame()
-        if not ff_proxy.empty and not lqd_proxy.empty:
-            credit_frame = ff_proxy.join(lqd_proxy, lsuffix="_ff", rsuffix="_lqd").dropna()
-            credit_frame.columns = ["FF_Proxy", "Credit_Price"]
-            credit_frame = credit_frame[
-                (credit_frame.index >= pd.to_datetime(start_date))
-                & (credit_frame.index <= pd.to_datetime(end_date))
-            ].copy()
-            credit_trend, credit_horizon = _recent_change(credit_frame["Credit_Price"])
-            credit_trend = -credit_trend
-            if not np.isnan(credit_trend):
-                credit_value = "Stress rising" if credit_trend > 0 else "Stress easing"
-                credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"
+            mmf_frame = pd.DataFrame()
+            if not ff_proxy.empty and not mmf_proxy.empty:
+                mmf_frame = ff_proxy.join(mmf_proxy, lsuffix="_ff", rsuffix="_mmf").dropna()
+                mmf_frame.columns = ["FF_Proxy", "MMF_Price"]
+                mmf_frame = mmf_frame[
+                    (mmf_frame.index >= pd.to_datetime(start_date))
+                    & (mmf_frame.index <= pd.to_datetime(end_date))
+                ].copy()
+                mmf_trend, mmf_horizon = _recent_change(mmf_frame["MMF_Price"])
+                if not np.isnan(mmf_trend):
+                    mmf_value = "Pressure building" if mmf_trend > 0 else "Pressure easing"
+                    mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"
 
-        scorecard_col1.metric("Stress composite", stress_value, delta=stress_delta)
-        scorecard_col2.metric("Bank beta regime", beta_value, delta=beta_delta)
-        scorecard_col3.metric("Curve regime", curve_value, delta=curve_delta)
-        scorecard_col4.metric("MMF pressure", mmf_value, delta=mmf_delta)
-        scorecard_col5.metric("Credit stress trend", credit_value, delta=credit_delta)
-        st.markdown(
-            "**What to notice:** the board matters most when stress, bank beta, curve, MMFs, and credit all point the same way; any split says the channel is still forming rather than fully settled."
-        )
+            credit_frame = pd.DataFrame()
+            if not ff_proxy.empty and not lqd_proxy.empty:
+                credit_frame = ff_proxy.join(lqd_proxy, lsuffix="_ff", rsuffix="_lqd").dropna()
+                credit_frame.columns = ["FF_Proxy", "Credit_Price"]
+                credit_frame = credit_frame[
+                    (credit_frame.index >= pd.to_datetime(start_date))
+                    & (credit_frame.index <= pd.to_datetime(end_date))
+                ].copy()
+                credit_trend, credit_horizon = _recent_change(credit_frame["Credit_Price"])
+                credit_trend = -credit_trend
+                if not np.isnan(credit_trend):
+                    credit_value = "Stress rising" if credit_trend > 0 else "Stress easing"
+                    credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"
 
-    st.subheader("Scenario Cards")
+            scorecard_col1.metric("Stress composite", stress_value, delta=stress_delta)
+            scorecard_col2.metric("Bank beta regime", beta_value, delta=beta_delta)
+            scorecard_col3.metric("Curve regime", curve_value, delta=curve_delta)
+            scorecard_col4.metric("MMF pressure", mmf_value, delta=mmf_delta)
+            scorecard_col5.metric("Credit stress trend", credit_value, delta=credit_delta)
+            st.markdown(
+                "**What to notice:** the board matters most when stress, bank beta, curve, MMFs, and credit all point the same way; any split says the channel is still forming rather than fully settled."
+            )
+
+    render_diagnostic_band(
+        "Monitoring opening",
+        "The scorecard compresses stress, beta, curve, MMF pressure, and credit stress into one live reading before the scenarios and playbook.",
+        "Treat it as the first triage layer for the seminar close.",
+        body=render_scorecard_surface,
+    )
+
+    render_research_module_intro(
+        "Scenario Cards",
+        "The scenario module translates the scorecard into forward-looking checks on how the channel could behave next.",
+    )
     st.markdown(
         "These scenarios are the seminar close in compact form: each card turns the scorecard into a forward-looking check on how the channel could behave next."
     )
@@ -1572,6 +1683,10 @@ with tab5:
         for title, research_takeaway, investor_takeaway, policy_takeaway in scenario_specs[2:]:
             render_scenario_card(title, research_takeaway, investor_takeaway, policy_takeaway)
 
+    render_research_module_intro(
+        "If this, then that playbook",
+        "The playbook turns the seminar close into a small set of decision rules that can be applied when the channel starts moving again.",
+    )
     st.subheader("If this, then that playbook")
 
     def render_playbook_rule(
@@ -1609,9 +1724,14 @@ with tab5:
         "Treat the combination as an active migration signal, not a benign rotation.",
     )
 
+    render_takeaway_block(
+        "Researchers should use the scorecard to classify the regime, investors should use the scenarios to pressure-test exposures, and policy users should use the playbook to decide when monitoring needs to tighten."
+    )
     st.subheader("Audience Takeaways")
     st.markdown(
-        "**Takeaway:** researchers should use the scorecard to classify the regime, investors should use the scenarios to pressure-test exposures, and policy users should use the playbook to decide when monitoring needs to tighten."
+        "- Researchers: use the scorecard to classify the regime.\n"
+        "- Investors: use the scenarios to pressure-test exposures.\n"
+        "- Policy users: use the playbook to decide when monitoring needs to tighten."
     )
 
 st.divider()
