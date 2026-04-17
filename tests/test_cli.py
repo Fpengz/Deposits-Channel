@@ -24,6 +24,18 @@ def _load_app_helper(name: str, extra_globals: dict[str, object] | None = None):
     return namespace[name]
 
 
+def _extract_tab_block(source: str, tab_name: str) -> str:
+    module = ast.parse(source)
+    for node in module.body:
+        if isinstance(node, ast.With):
+            for item in node.items:
+                expr = item.context_expr
+                if isinstance(expr, ast.Name) and expr.id == tab_name:
+                    lines = source.splitlines()
+                    return "\n".join(lines[node.lineno - 1 : node.end_lineno])
+    raise AssertionError(f"Could not find block for {tab_name}")
+
+
 def test_build_app_command() -> None:
     command = cli.build_command("app", ["--server.headless", "true"])
 
@@ -48,7 +60,7 @@ def test_build_hooks_command_passes_extra_args() -> None:
 
 def test_theory_tab_story_labels_present() -> None:
     content = Path("src/app.py").read_text()
-    theory_block = content.split("with tab2:")[0]
+    theory_block = _extract_tab_block(content, "tab1")
 
     assert "Theory & Simulation" in theory_block
     assert "Q1: What is the deposits channel mechanism?" in theory_block
@@ -81,6 +93,30 @@ def test_empirical_terminal_signal_board_labels_present() -> None:
     assert "Dormant" in content
 
 
+def test_empirical_terminal_reads_like_research_seminar() -> None:
+    content = Path("src/app.py").read_text()
+    empirical_block = _extract_tab_block(content, "tab2")
+
+    assert (
+        "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
+        in empirical_block
+    )
+    assert "**Short answer:**" in empirical_block
+    assert empirical_block.index("Signal Board") < empirical_block.index(
+        "Q8: Which regime are we in?"
+    )
+    assert empirical_block.index("Q8: Which regime are we in?") < empirical_block.index(
+        "Q3: Do policy events create abnormal returns?"
+    )
+    assert empirical_block.index(
+        "Q3: Do policy events create abnormal returns?"
+    ) < empirical_block.index("Q5: Does fear amplify the channel?")
+    assert empirical_block.index("Q5: Does fear amplify the channel?") < empirical_block.index(
+        "Q6: How do shocks propagate over time?"
+    )
+    assert "The selected timeframe leaves no overlapping observations" in empirical_block
+
+
 def test_empirical_terminal_keeps_mmf_out_of_core_dropna_path() -> None:
     content = Path("src/app.py").read_text()
     assert 'core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]' in content
@@ -95,7 +131,7 @@ def test_empirical_terminal_drops_missing_factor_rows_before_regressions() -> No
 
 def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> None:
     content = Path("src/app.py").read_text()
-    assert "Selected timeframe does not have enough return/rate observations" in content
+    assert "does not leave enough aligned return and rate observations" in content
     assert "if data.empty:" in content
 
 

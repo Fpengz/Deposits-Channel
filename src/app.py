@@ -462,7 +462,15 @@ with tab1:
 
 with tab2:
     st.header("Empirical Terminal")
-    st.markdown("Each section asks a market question, then answers it with data.")
+    st.markdown(
+        "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
+    )
+    st.markdown(
+        "**Short answer:** the deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up; the rest of the section checks whether that pattern behaves like a regime, a policy-event response, a fear amplifier, or a propagation channel."
+    )
+    st.markdown(
+        "Each section asks a market question, then answers it with data, with transitions that follow the evidence from the signal board to the downstream tests."
+    )
 
     merged = pd.DataFrame()
     if (
@@ -487,7 +495,9 @@ with tab2:
         ]
 
         if data_full.empty:
-            st.warning("Selected timeframe has no data overlap.")
+            st.warning(
+                "The selected timeframe leaves no overlapping observations, so the empirical board cannot be assembled."
+            )
         else:
             core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]
             required_empirical_factors = ["d_ff", "r_kbe", "r_iat", "r_spy"]
@@ -503,7 +513,7 @@ with tab2:
             data = data.dropna(subset=required_empirical_factors)
             if data.empty:
                 st.warning(
-                    "Selected timeframe does not have enough return/rate observations for empirical analysis."
+                    "The selected timeframe does not leave enough aligned return and rate observations to estimate the empirical panel cleanly."
                 )
             else:
                 # Q1. Market Evolution
@@ -596,14 +606,16 @@ with tab2:
                 # Q2. Stress Signal
                 st.subheader("Q2: Is stress building in the system?")
                 st.markdown(
-                    "We combine rate shocks, volatility, and bank drawdowns into one signal."
+                    "We combine rate shocks, volatility, and bank drawdowns into one signal, then use that signal to anchor the rest of the seminar."
                 )
                 data["r_vix"] = calculate_returns(data["VIX"])
                 stress = build_stress_index(
                     data["d_ff"], data["r_vix"], data["KBE"], window=252, smoothing=5
                 )
                 if stress.dropna().empty:
-                    st.warning("Not enough data to compute the Stress Composite Index.")
+                    st.warning(
+                        "The chosen window does not yet produce a stable stress composite, so the downstream empirical reading stays tentative."
+                    )
                 else:
                     threshold = stress.quantile(0.95)
                     fig_stress = go.Figure()
@@ -638,12 +650,40 @@ with tab2:
                     )
 
                     st.subheader("Signal Board")
+                    st.markdown(
+                        "With the board in hand, the next question is whether the channel is merely active or fully in a transmission regime."
+                    )
                     board_col1, board_col2, board_col3 = st.columns(3)
                     board_col1.metric("Channel State", channel_state)
                     board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
                     board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
                     st.caption(
                         "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
+                    )
+
+                    st.subheader("Q8: Which regime are we in?")
+                    if channel_state == "Stressed":
+                        regime_label = "Stress regime"
+                    elif channel_state == "Active":
+                        regime_label = "Transmission regime"
+                    elif channel_state == "Dormant":
+                        regime_label = "Dormant regime"
+                    else:
+                        regime_label = "Data-building regime"
+                    st.markdown(
+                        f"**Current regime:** {regime_label}. The signal board blends stress, bank beta, and bank-vs-MMF relative performance."
+                    )
+                    st.markdown(
+                        "**Research takeaway:** Regime framing helps separate a live deposits-channel signal from routine market noise."
+                    )
+                    st.markdown(
+                        "**Investor takeaway:** When the board turns more active, bank equity sensitivity deserves tighter monitoring."
+                    )
+                    st.markdown(
+                        "**Policy/risk takeaway:** A stressed board suggests liquidity and confidence risks may be reinforcing each other."
+                    )
+                    st.markdown(
+                        "Once the regime is visible, the next check is whether policy events leave abnormal footprints in bank and market returns."
                     )
 
                 # Q3. Policy Event Impact
@@ -659,7 +699,7 @@ with tab2:
                 car = event_study_car(returns_df, event_dates, window=5, benchmark_col="SPY")
                 if car.empty:
                     st.warning(
-                        "Not enough data to compute event study CARs for the selected period."
+                        "The event window does not contain enough aligned observations to estimate average CARs for the selected period."
                     )
                 else:
                     fig_car = go.Figure()
@@ -685,7 +725,9 @@ with tab2:
                 beta_spy = calculate_rolling_beta(data, "r_spy", "d_ff", window=252)
                 beta_df = pd.DataFrame({"KBE": beta_kbe, "IAT": beta_iat, "SPY": beta_spy}).dropna()
                 if beta_df.empty:
-                    st.warning("Not enough data to compute rolling betas.")
+                    st.warning(
+                        "The rolling window is too sparse to support a stable beta surface in this period."
+                    )
                 else:
                     fig_beta = build_beta_heatmap(beta_df)
                     fig_beta.update_layout(
@@ -698,7 +740,9 @@ with tab2:
 
                 # Q5. Fear Amplification
                 st.subheader("Q5: Does fear amplify the channel?")
-                st.markdown("We split betas by high vs low VIX to test amplification.")
+                st.markdown(
+                    "We split betas by high vs low VIX to test whether market fear makes the channel materially stronger."
+                )
                 high_vix = data[data["VIX"] > 20]
                 low_vix = data[data["VIX"] <= 20]
 
@@ -712,18 +756,21 @@ with tab2:
                     st.caption(
                         "A more negative Beta during high VIX confirms that Deposits Channel risks are amplified during market stress."
                     )
+                    st.markdown(
+                        "The fear split closes the event test by showing whether stress changes the strength of the same rate response."
+                    )
 
                 # Q6. Shock Propagation
                 st.subheader("Q6: How do shocks propagate over time?")
                 st.markdown(
-                    "Impulse responses trace the shock ripple over the next 20 trading days."
+                    "Impulse responses trace the shock ripple over the next 20 trading days, letting us see how quickly the channel travels through the system."
                 )
                 irf_kbe = calculate_irf(data, "r_kbe", "d_ff", periods=20)
                 irf_iat = calculate_irf(data, "r_iat", "d_ff", periods=20)
 
                 if irf_kbe is None or irf_iat is None:
                     st.warning(
-                        "IRF model failed to fit for the selected data window. Try a longer timeframe."
+                        "The impulse-response model cannot be fit cleanly in this window, so the propagation path remains underidentified."
                     )
                 else:
                     fig_irf = go.Figure()
@@ -764,31 +811,6 @@ with tab2:
                     ),
                     width="stretch",
                 )
-
-                st.subheader("Q8: Which regime are we in?")
-                if stress.dropna().empty:
-                    st.warning("Not enough data to frame the current regime.")
-                else:
-                    if channel_state == "Stressed":
-                        regime_label = "Stress regime"
-                    elif channel_state == "Active":
-                        regime_label = "Transmission regime"
-                    elif channel_state == "Dormant":
-                        regime_label = "Dormant regime"
-                    else:
-                        regime_label = "Data-building regime"
-                    st.markdown(
-                        f"**Current regime:** {regime_label}. The signal board blends stress, bank beta, and bank-vs-MMF relative performance."
-                    )
-                    st.markdown(
-                        "**Research takeaway:** Regime framing helps separate a live deposits-channel signal from routine market noise."
-                    )
-                    st.markdown(
-                        "**Investor takeaway:** When the board turns more active, bank equity sensitivity deserves tighter monitoring."
-                    )
-                    st.markdown(
-                        "**Policy/risk takeaway:** A stressed board suggests liquidity and confidence risks may be reinforcing each other."
-                    )
 
                 st.subheader("Takeaway")
                 st.markdown(
