@@ -176,7 +176,7 @@ def render_diagnostic_band(
         if note
         else ""
     )
-    if body is None:
+    with st.container(border=True):
         st.markdown(
             f"""
             <div class="diagnostic-band">
@@ -188,20 +188,8 @@ def render_diagnostic_band(
             """,
             unsafe_allow_html=True,
         )
-        return
-
-    st.markdown(
-        f"""
-        <div class="diagnostic-band">
-          <div class="module-kicker">Diagnostic Band</div>
-          <h3>{html.escape(title)}</h3>
-          <p>{html.escape(summary)}</p>
-          {note_html}
-        """,
-        unsafe_allow_html=True,
-    )
-    body()
-    st.markdown("</div>", unsafe_allow_html=True)
+        if body is not None:
+            body()
 
 
 def render_research_module_intro(title: str, why_it_matters: str) -> None:
@@ -697,7 +685,6 @@ with tab2:
                     "Q1: Are banks sensitive to rate shocks?",
                     "The first empirical module checks whether bank returns actually move with rate shocks before we interpret any regime story.",
                 )
-                st.subheader("Q1: Are banks sensitive to rate shocks?")
                 st.markdown("We compare rate changes to bank and market performance.")
                 fig_ts = go.Figure()
                 fig_ts.add_trace(
@@ -762,7 +749,6 @@ with tab2:
                     "Q4: Is sensitivity stable over time?",
                     "Recursive betas check whether rate exposure drifts as the market moves between calmer and more stressed periods.",
                 )
-                st.subheader("Q4: Is sensitivity stable over time?")
                 st.markdown("Recursive betas show whether rate exposure drifts through regimes.")
                 betas, se = calculate_recursive_ols(data, "r_kbe", "d_ff")
                 fig_rec = go.Figure()
@@ -801,7 +787,6 @@ with tab2:
                     "Q2: Is stress building in the system?",
                     "This module tests whether rates, volatility, and bank drawdowns are already accumulating into a channel-wide signal.",
                 )
-                st.subheader("Q2: Is stress building in the system?")
                 st.markdown(
                     "We combine rate shocks, volatility, and bank drawdowns into one signal, then use that signal to anchor the rest of the seminar."
                 )
@@ -869,7 +854,6 @@ with tab2:
                         "Q8: Which regime are we in?",
                         "This summary translates the signal board into a regime label before the downstream event and propagation evidence continue.",
                     )
-                    st.subheader("Q8: Which regime are we in?")
                     if channel_state == "Stressed":
                         regime_label = "Stress regime"
                     elif channel_state == "Active":
@@ -899,7 +883,6 @@ with tab2:
                     "Q3: Do policy events create abnormal returns?",
                     "Event studies test whether FOMC dates produce footprints that are different from ordinary market noise.",
                 )
-                st.subheader("Q3: Do policy events create abnormal returns?")
                 st.markdown("We average cumulative abnormal returns around FOMC dates.")
                 event_dates = [
                     pd.to_datetime(d)
@@ -955,7 +938,6 @@ with tab2:
                     "Q5: Does fear amplify the channel?",
                     "This split asks whether volatility makes the same rate shock more potent for bank returns.",
                 )
-                st.subheader("Q5: Does fear amplify the channel?")
                 st.markdown(
                     "We split betas by high vs low VIX to test whether market fear makes the channel materially stronger."
                 )
@@ -989,7 +971,6 @@ with tab2:
                     "Q6: How do shocks propagate over time?",
                     "Impulse responses show whether the channel diffuses quickly or keeps working through the system over multiple days.",
                 )
-                st.subheader("Q6: How do shocks propagate over time?")
                 st.markdown(
                     "Impulse responses trace the shock ripple over the next 20 trading days, letting us see how quickly the channel travels through the system."
                 )
@@ -1030,7 +1011,6 @@ with tab2:
                     "Q7: How do the variables co-move?",
                     "The correlation surface checks whether the system behaves as a connected channel or as a set of unrelated indicators.",
                 )
-                st.subheader("Q7: How do the variables co-move?")
                 corr = calculate_correlation_matrix(
                     data[["d_ff", "r_kbe", "r_iat", "r_spy", "r_vix"]].dropna()
                 )
@@ -1081,7 +1061,6 @@ with tab3:
             "Q1: Where do deposits go when spreads widen?",
             "The first macro module asks whether deposit migration is visible in the bank-versus-MMF proxy relationship.",
         )
-        st.subheader("Q1: Where do deposits go when spreads widen?")
         st.markdown(
             "We proxy flows by comparing bank equities to money market funds; this is the observable stand-in for deposit migration, not a literal flow measure."
         )
@@ -1121,7 +1100,6 @@ with tab3:
             "Q2: What macro regime are we in?",
             "The curve regime anchors the macro story by showing whether the funding backdrop is normal, squeezed, or under stress.",
         )
-        st.subheader("Q2: What macro regime are we in?")
         st.markdown("The channel strains when the curve is flat or inverted.")
         macro_data["Slope"] = calculate_yield_curve_slope(
             macro_data["Ten_Year"], macro_data["FF_Proxy"]
@@ -1191,7 +1169,6 @@ with tab3:
         "Q3: Is credit stress feeding back into banks?",
         "Credit stress closes the loop by testing whether downstream pressure is showing up in bank returns.",
     )
-    st.subheader("Q3: Is credit stress feeding back into banks?")
     st.markdown("We compare daily credit stress moves to bank returns.")
 
     if (
@@ -1322,7 +1299,6 @@ with tab4:
                 "Q1: What conditions preceded the break?",
                 "This opening module frames the crisis as a balance-sheet setup, not a one-day surprise.",
             )
-            st.subheader("Q1: Preconditions -> Break")
             st.markdown(
                 "The preconditions were rate pressure, large unrealized bond losses, and a funding base that could not absorb fast deposit outflows."
             )
@@ -1374,7 +1350,6 @@ with tab4:
                 "Q2: How did the market interpret the break?",
                 "This module shows how the selloff and divergence turned a balance-sheet event into a confidence story.",
             )
-            st.subheader("Q2: Market interpretation")
             st.markdown("Normalize KBE and IAT to visualize cumulative separation.")
             kbe_norm = crisis_data["KBE"] / crisis_data["KBE"].iloc[0]
             iat_norm = crisis_data["IAT"] / crisis_data["IAT"].iloc[0]
@@ -1396,7 +1371,6 @@ with tab4:
                 "Q3: How does market interpretation map back to channel mechanics?",
                 "The waterfall turns the narrative back into mechanics by decomposing the visible damage into deposits, AOCI, and equity divergence.",
             )
-            st.subheader("Q3: Market interpretation -> channel mechanics")
             st.markdown(
                 "An illustrative waterfall decomposes the impact into deposits, AOCI, and equity divergence."
             )
@@ -1432,7 +1406,6 @@ with tab4:
                 "Q4: What would have changed the outcome?",
                 "The counterfactuals test whether the crisis was mostly about duration, stickiness, or concentration.",
             )
-            st.subheader("Q4: Counterfactual repair")
             st.markdown(
                 "We run simple counterfactuals to show which balance-sheet choices would have changed the outcome, not just softened the optics after the fact."
             )
@@ -1479,7 +1452,6 @@ with tab4:
         "Stress Test Simulation",
         "The final check turns the crisis lesson into a Monte Carlo distribution of possible deposit outcomes.",
     )
-    st.subheader("Stress Test Simulation")
     if st.button("🚀 Run 1,000 Trial Stress Test"):
         trials = run_monte_carlo_simulation(fed_funds_rate, market_power, base_volume, elasticity)
         fig_hist = px.histogram(
@@ -1687,7 +1659,6 @@ with tab5:
         "If this, then that playbook",
         "The playbook turns the seminar close into a small set of decision rules that can be applied when the channel starts moving again.",
     )
-    st.subheader("If this, then that playbook")
 
     def render_playbook_rule(
         rule: str, research_takeaway: str, investor_takeaway: str, policy_takeaway: str

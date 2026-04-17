@@ -206,7 +206,7 @@ def test_macro_tab_uses_flow_of_funds_seminar_framing() -> None:
 
 def test_case_study_counterfactual_labels_present() -> None:
     content = Path("src/app.py").read_text()
-    assert "Q4: Counterfactual repair" in content
+    assert "Q4: What would have changed the outcome?" in content
     assert "Lower duration" in content
 
 
@@ -277,6 +277,32 @@ def test_tabs_adopt_research_modules_takeaways_and_wrapped_diagnostics() -> None
         assert any(
             any(keyword.arg == "body" for keyword in call.keywords) for call in diagnostic_calls
         )
+
+
+def test_research_module_intros_replace_legacy_duplicate_subheaders() -> None:
+    content = APP_SOURCE.read_text()
+
+    duplicate_headings = [
+        "Q1: Are banks sensitive to rate shocks?",
+        "Q2: Is stress building in the system?",
+        "Q8: Which regime are we in?",
+        "Q3: Do policy events create abnormal returns?",
+        "Q5: Does fear amplify the channel?",
+        "Q6: How do shocks propagate over time?",
+        "Q7: How do the variables co-move?",
+        "Q1: Where do deposits go when spreads widen?",
+        "Q2: What macro regime are we in?",
+        "Q3: Is credit stress feeding back into banks?",
+        "Q1: What conditions preceded the break?",
+        "Q2: How did the market interpret the break?",
+        "Q3: How does market interpretation map back to channel mechanics?",
+        "Q4: What would have changed the outcome?",
+        "Stress Test Simulation",
+        "If this, then that playbook",
+    ]
+
+    for heading in duplicate_headings:
+        assert content.count(f'st.subheader("{heading}")') == 0
 
 
 def test_monitoring_tab_matches_planned_structure() -> None:
@@ -431,8 +457,27 @@ def test_visual_system_helpers_render_semantic_html() -> None:
     calls: list[tuple[str, bool]] = []
 
     class FakeStreamlit:
+        def __init__(self) -> None:
+            self.container_depth = 0
+            self.container_events: list[str] = []
+
         def markdown(self, body: str, unsafe_allow_html: bool = False) -> None:
             calls.append((body, unsafe_allow_html))
+
+        def container(self, border: bool = False):
+            self.container_events.append(f"open:{border}")
+
+            class _Container:
+                def __enter__(inner_self):
+                    fake_streamlit.container_depth += 1
+                    return inner_self
+
+                def __exit__(inner_self, exc_type, exc, tb):
+                    fake_streamlit.container_depth -= 1
+                    fake_streamlit.container_events.append("close")
+                    return False
+
+            return _Container()
 
     fake_streamlit = FakeStreamlit()
     render_seminar_banner = _load_app_helper(
@@ -445,22 +490,25 @@ def test_visual_system_helpers_render_semantic_html() -> None:
         "render_takeaway_block", {"st": fake_streamlit, "html": html}
     )
 
+    def render_metric_surface() -> None:
+        assert fake_streamlit.container_depth > 0
+        fake_streamlit.markdown("<span>metric surface</span>", unsafe_allow_html=True)
+
     render_seminar_banner("Open <session>", "Framing & synthesis", "Answer <yes>")
     render_diagnostic_band(
         "Board",
         "Track the live read",
         "Use the scorecard first",
-        body=lambda: fake_streamlit.markdown("<span>metric surface</span>", unsafe_allow_html=True),
+        body=render_metric_surface,
     )
     render_takeaway_block("Lead with the surface <scan> before the narrative.")
 
-    assert len(calls) == 5
+    assert len(calls) == 4
 
     banner_body, banner_allow_html = calls[0]
     band_body, band_allow_html = calls[1]
     wrapped_surface_body, wrapped_surface_allow_html = calls[2]
-    band_close_body, band_close_allow_html = calls[3]
-    takeaway_body, takeaway_allow_html = calls[4]
+    takeaway_body, takeaway_allow_html = calls[3]
 
     assert banner_allow_html is True
     assert '<div class="seminar-banner">' in banner_body
@@ -470,6 +518,7 @@ def test_visual_system_helpers_render_semantic_html() -> None:
     assert "<strong>Short answer:</strong> Answer &lt;yes&gt;" in banner_body
 
     assert band_allow_html is True
+    assert fake_streamlit.container_events == ["open:True", "close"]
     assert '<div class="diagnostic-band">' in band_body
     assert "Diagnostic Band" in band_body
     assert "Board" in band_body
@@ -478,9 +527,6 @@ def test_visual_system_helpers_render_semantic_html() -> None:
 
     assert wrapped_surface_allow_html is True
     assert wrapped_surface_body == "<span>metric surface</span>"
-
-    assert band_close_allow_html is True
-    assert band_close_body == "</div>"
 
     assert takeaway_allow_html is True
     assert '<div class="takeaway-block">' in takeaway_body
