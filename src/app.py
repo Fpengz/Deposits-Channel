@@ -1,3 +1,4 @@
+import html
 import warnings
 
 import numpy as np
@@ -86,6 +87,106 @@ except ImportError:
 # Suppress statsmodels frequency warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="statsmodels")
 st.set_page_config(page_title="Deposits Channel Research Terminal", layout="wide")
+
+VISUAL_SYSTEM_CSS = """
+<style>
+:root {
+    --page-bg: #f6f3ee;
+    --panel-bg: #fbfaf7;
+    --panel-border: #d8d2c6;
+    --ink: #1f1f1c;
+    --muted: #5d5a55;
+    --accent: #2f5d50;
+    --accent-soft: #dce8e1;
+}
+
+.seminar-banner {
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--panel-border);
+    background: linear-gradient(180deg, #fcfbf8 0%, #f2eee6 100%);
+    border-radius: 18px;
+    margin-bottom: 1.2rem;
+}
+
+.diagnostic-band {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    border-radius: 16px;
+    margin: 1rem 0 1.4rem;
+}
+
+.research-module {
+    padding: 1rem 1.1rem;
+    border-left: 4px solid var(--accent);
+    background: #fcfbf8;
+    border-radius: 14px;
+    margin: 1rem 0 1.25rem;
+}
+
+.takeaway-block {
+    padding: 1rem 1.1rem;
+    background: var(--accent-soft);
+    border-radius: 14px;
+    border: 1px solid #bfd0c7;
+    margin-top: 1rem;
+}
+
+.module-kicker {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.short-answer {
+    font-weight: 600;
+    color: var(--ink);
+}
+</style>
+"""
+
+st.markdown(VISUAL_SYSTEM_CSS, unsafe_allow_html=True)
+
+
+def render_seminar_banner(title: str, framing: str, short_answer: str) -> None:
+    st.markdown(
+        f"""
+        <div class="seminar-banner">
+          <div class="module-kicker">Research Seminar Module</div>
+          <h2>{html.escape(title)}</h2>
+          <p>{html.escape(framing)}</p>
+          <p class="short-answer"><strong>Short answer:</strong> {html.escape(short_answer)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_research_module_intro(title: str, why_it_matters: str) -> None:
+    st.markdown(
+        f"""
+        <div class="research-module">
+          <div class="module-kicker">Why this matters</div>
+          <h3>{html.escape(title)}</h3>
+          <p>{html.escape(why_it_matters)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_takeaway_block(text: str) -> None:
+    st.markdown(
+        f"""
+        <div class="takeaway-block">
+          <strong>Takeaway:</strong> {html.escape(text)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 st.title("The Deposits Channel: Macro-Finance Terminal v4.0")
 st.markdown("""

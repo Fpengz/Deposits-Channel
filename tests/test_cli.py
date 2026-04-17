@@ -368,3 +368,14 @@ def test_visual_system_guardrail_anchors_are_present_in_app_source() -> None:
         "takeaway-block",
     ]:
         assert anchor in content
+
+
+def test_app_defines_visual_system_helpers() -> None:
+    content = APP_SOURCE.read_text()
+
+    for helper in [
+        "def render_seminar_banner(",
+        "def render_research_module_intro(",
+        "def render_takeaway_block(",
+    ]:
+        assert helper in content
