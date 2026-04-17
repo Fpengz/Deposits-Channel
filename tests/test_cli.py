@@ -52,6 +52,22 @@ def test_theory_tab_story_labels_present() -> None:
     assert "Research takeaway" in content
 
 
+def test_research_seminar_spine_labels_and_tabs_present() -> None:
+    content = APP_SOURCE.read_text()
+
+    for label in ["Short answer", "What to notice", "Takeaway"]:
+        assert label in content
+
+    for heading in [
+        "Theory & Simulation",
+        "Empirical Terminal",
+        "Macro & Credit",
+        "Case Study",
+        "Monitoring & Scenarios",
+    ]:
+        assert heading in content
+
+
 def test_empirical_terminal_signal_board_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Signal Board" in content
