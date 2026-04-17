@@ -763,6 +763,9 @@ with tab1:
     render_takeaway_block(
         "The channel becomes dangerous when partial pass-through, high elasticity, and duration losses line up at the same time."
     )
+    st.caption(
+        "Continue in Empirical Terminal if you want to see whether the mechanism appears in the selected sample."
+    )
 
 with tab2:
     render_seminar_banner(
@@ -1199,6 +1202,9 @@ with tab2:
 
                 render_takeaway_block(
                     "Bank sensitivity to rates spikes in stress regimes and clusters around policy events."
+                )
+                st.caption(
+                    "Continue in Macro & Credit if you want to trace the spillover into the wider funding backdrop."
                 )
 
 with tab3:
@@ -1651,6 +1657,9 @@ with tab4:
             render_takeaway_block(
                 "The 2023 episode shows how fast liquidity outflows and AOCI losses can propagate into equity stress."
             )
+            st.caption(
+                "Continue in Monitoring & Scenarios if you want to turn the episode into a live watchlist."
+            )
             st.subheader("Audience Takeaways")
             st.markdown(
                 "- Researchers: March 2023 exposed where the canonical channel became nonlinear.\n"
@@ -1819,6 +1828,9 @@ with tab5:
         "The scorecard compresses stress, beta, curve, MMF pressure, and credit stress into one live reading before the scenarios and playbook.",
         "Treat it as the first triage layer for the seminar close.",
         body=render_scorecard_surface,
+    )
+    st.caption(
+        "Read this next: after the scorecard, use the scenario cards to pressure-test the most likely stress paths."
     )
 
     render_section_anchor("Monitoring & Scenarios", "Scenario cards")

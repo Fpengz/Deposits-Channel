@@ -258,8 +258,38 @@ def test_guided_entry_orientation_is_present_without_becoming_tutorial_heavy() -
     assert "How to read this terminal" in content
     assert "Selected sample" in content
     assert "The case-study tab is a fixed March 2023 episode by design." in content
-    assert 2 <= read_next_count <= 4
-    assert 0 <= only_one_chart_count <= 2
+    assert 4 <= read_next_count <= 6
+    assert 1 <= only_one_chart_count <= 2
+
+
+def test_app_includes_within_tab_read_next_cues() -> None:
+    content = APP_SOURCE.read_text()
+    empirical_block = _extract_tab_block(content, "tab2")
+    monitoring_block = _extract_tab_block(content, "tab5")
+
+    assert content.count("Read this next") >= 5
+    assert content.count("If you only look at one chart") >= 1
+    assert (
+        "Read this next: if the signal board looks active, move to Q8 before the event study."
+        in empirical_block
+    )
+    assert (
+        "Read this next: after the scorecard, use the scenario cards to pressure-test the most likely stress paths."
+        in monitoring_block
+    )
+    assert "If you only look at one chart, start with the scorecard." in monitoring_block
+
+
+def test_app_includes_cross_tab_handoffs() -> None:
+    content = APP_SOURCE.read_text()
+
+    assert content.count("Continue in") >= 3
+    for prompt in [
+        "Continue in Empirical Terminal if you want to see whether the mechanism appears in the selected sample.",
+        "Continue in Macro & Credit if you want to trace the spillover into the wider funding backdrop.",
+        "Continue in Monitoring & Scenarios if you want to turn the episode into a live watchlist.",
+    ]:
+        assert prompt in content
 
 
 def test_macro_regime_matrix_labels_present() -> None:
