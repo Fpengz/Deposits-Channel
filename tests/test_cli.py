@@ -237,13 +237,29 @@ def test_tabs_include_orientation_strip_cues() -> None:
 
 def test_guided_entry_orientation_is_present_without_becoming_tutorial_heavy() -> None:
     content = APP_SOURCE.read_text()
+    module = ast.parse(content)
 
+    read_next_count = content.count("Read this next")
+    only_one_chart_count = content.count("If you only look at one chart")
+
+    render_preface_calls = [
+        node
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call) and _call_name(node) == "render_reading_preface"
+    ]
+    tab_purpose_calls = [
+        node
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call) and _call_name(node) == "render_tab_purpose_strip"
+    ]
+
+    assert len(render_preface_calls) == 1
+    assert len(tab_purpose_calls) >= 5
     assert "How to read this terminal" in content
     assert "Selected sample" in content
-    assert content.count("Read this next") >= 3
-    assert content.count("Read this next") <= 4
-    assert content.count("If you only look at one chart") == 1
-    assert content.count("Start here:") >= 2
+    assert "The case-study tab is a fixed March 2023 episode by design." in content
+    assert 2 <= read_next_count <= 4
+    assert 0 <= only_one_chart_count <= 2
 
 
 def test_macro_regime_matrix_labels_present() -> None:

@@ -250,9 +250,9 @@ def render_reading_preface(
         <div class="seminar-banner">
           <div class="module-kicker">How to read this terminal</div>
           <h2>How to read this terminal</h2>
-          <p>Start here: read the opening mechanism, then use the selected sample in the sidebar as the common frame for the evidence below.</p>
+          <p>Start here: read the opening mechanism, then use the selected sample in the sidebar as the common frame for the tabs that follow live market data. The case-study tab is a fixed March 2023 episode by design.</p>
           <p><strong>Selected sample:</strong> {html.escape(sample_start_label)} to {html.escape(sample_end_label)}. If a panel says the data are unavailable, treat that as a coverage note for this window rather than a change in the underlying story.</p>
-          <p class="short-answer"><strong>Question:</strong> Which part of the deposits channel is under pressure in the selected sample?</p>
+          <p class="short-answer"><strong>Question:</strong> Which part of the deposits channel looks most stressed in the current market sample, and how does that compare with the March 2023 case study?</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1557,11 +1557,6 @@ with tab5:
         "Which stress conditions should you monitor now?",
         "You want a compact watchlist and scenario playbook at the end of the terminal.",
         "Start with the scorecard, then read the playbook beneath the stress surfaces.",
-    )
-    render_diagnostic_band(
-        "Monitoring opening",
-        "The scorecard compresses stress, beta, curve, MMF pressure, and credit stress into one live reading before the scenarios and playbook.",
-        "Treat it as the first triage layer for the seminar close.",
     )
     st.markdown(
         "We close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last."
