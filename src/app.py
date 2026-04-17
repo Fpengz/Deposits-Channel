@@ -175,9 +175,17 @@ def _recent_change(series: pd.Series) -> tuple[float, int]:
 
 with tab1:
     st.header("Theory & Simulation")
-    st.markdown("Each section answers a core question, then pushes deeper into the mechanics.")
+    st.markdown(
+        "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
+    )
 
     st.subheader("Q1: What is the deposits channel mechanism?")
+    st.markdown(
+        "**Short answer:** policy tightening matters when banks can keep deposit rates sticky while alternative cash vehicles become more attractive."
+    )
+    st.markdown(
+        "By the end of this section, the reader should know which assumptions make the system fragile and why."
+    )
     st.markdown("The channel transmits policy rates into bank funding costs and lending supply.")
     st.markdown(r"""
     **Fed Funds Rate ↑ → Deposit Spread ↑ → Deposit Outflow → Bank Lending ↓**
@@ -197,6 +205,9 @@ with tab1:
             "**Transmission**\n\nAs deposits flow to Money Market Funds, banks lose their cheapest source of funding and must cut lending."
         )
 
+    st.markdown(
+        "The next step is pass-through: how much of a policy move reaches deposit pricing before the volume response begins."
+    )
     st.divider()
 
     # Sidebar for simulation controls
@@ -239,7 +250,9 @@ with tab1:
     )
 
     st.subheader("Q2: How sensitive is the mechanism to assumptions?")
-    st.markdown("We vary market power and depositor elasticity to see where spreads bite most.")
+    st.markdown(
+        "This pass-through step varies market power and depositor elasticity to see where spreads bite most."
+    )
 
     rates = [r / 100.0 for r in range(0, 1000, 25)]
     volumes = [
@@ -359,9 +372,14 @@ with tab1:
         template="plotly_white",
     )
     st.plotly_chart(fig_syn, width="stretch")
+    st.markdown(
+        "**What to notice:** concentrated banks sit farther below full pass-through, so the policy shock is absorbed by depositors unevenly."
+    )
 
     st.subheader("Q3: What happens under plausible rate paths?")
-    st.markdown("Nine simulated paths map policy uncertainty into funding outcomes.")
+    st.markdown(
+        "Now we move to deposit sensitivity: nine simulated paths map policy uncertainty into funding outcomes."
+    )
     rate_paths = generate_rate_paths(current_rate=fed_funds_rate, paths=9, days=252, seed=42)
     deposit_paths = generate_deposit_paths(rate_paths, market_power, base_volume, elasticity)
     for row in range(3):
@@ -386,10 +404,13 @@ with tab1:
                 showlegend=False,
             )
             cols[col_idx].plotly_chart(fig_path, width="stretch")
+    st.markdown(
+        "**What to notice:** the same rate path can produce very different deposit trajectories once elasticity shifts the curve's steepness."
+    )
 
     st.subheader("Q4: How do rate changes impact AOCI?")
     st.markdown(
-        "Duration risk translates rate changes into unrealized losses on bank bond portfolios."
+        "The scenario step adds duration risk, translating rate changes into unrealized losses on bank bond portfolios."
     )
     rate_changes = np.linspace(-0.05, 0.05, 51)
     bond_portfolio_value = base_volume * 0.6
@@ -406,11 +427,14 @@ with tab1:
         template="plotly_white",
     )
     st.plotly_chart(fig_aoci, width="stretch")
+    st.markdown(
+        "**What to notice:** rate-path scenarios matter because bond losses can arrive even before deposit outflows fully show up."
+    )
 
     st.subheader("Q5: When do outflows and AOCI become destabilizing?")
     st.markdown(
-        "Outflow pressure becomes more dangerous when unrealized bond losses are already eating into capital. "
-        "This simple grid marks the zone where deposit runoff and AOCI losses combine into a destabilizing stress pocket."
+        "This is the destabilization threshold: outflow pressure becomes more dangerous when unrealized bond losses are already eating into capital. "
+        "The grid marks the zone where deposit runoff and AOCI losses combine into a stress pocket."
     )
     outflow_range = np.linspace(0.0, 0.2, 5)
     aoci_range = np.linspace(0.0, 0.15, 4)
@@ -433,18 +457,7 @@ with tab1:
         "**What to notice:** Once both pressures build together, the safe region disappears quickly."
     )
     st.markdown(
-        "**Research takeaway:** The joint threshold matters more than either margin in isolation."
-    )
-    st.markdown(
-        "**Investor takeaway:** Watch for banks with both deposit flight and hidden bond losses."
-    )
-    st.markdown(
-        "**Policy/risk takeaway:** Liquidity backstops matter most when AOCI has already weakened buffers."
-    )
-
-    st.subheader("Takeaway")
-    st.markdown(
-        "**Rising rates + market power = widening spreads, faster outflows, and thinner capital buffers.**"
+        "**Takeaway:** the channel becomes dangerous when partial pass-through, high elasticity, and duration losses line up at the same time."
     )
 
 with tab2:

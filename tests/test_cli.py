@@ -48,8 +48,15 @@ def test_build_hooks_command_passes_extra_args() -> None:
 
 def test_theory_tab_story_labels_present() -> None:
     content = Path("src/app.py").read_text()
-    assert "Q5: When do outflows and AOCI become destabilizing?" in content
-    assert "Research takeaway" in content
+    theory_block = content.split("with tab2:")[0]
+
+    assert "Theory & Simulation" in theory_block
+    assert "Q1: What is the deposits channel mechanism?" in theory_block
+    assert "**Short answer:**" in theory_block
+    assert "By the end of this section" in theory_block
+    assert "Q5: When do outflows and AOCI become destabilizing?" in theory_block
+    assert "**What to notice:**" in theory_block
+    assert "**Takeaway:**" in theory_block
 
 
 def test_research_seminar_spine_labels_and_tabs_present() -> None:
