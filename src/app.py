@@ -126,6 +126,15 @@ VISUAL_SYSTEM_CSS = """
     margin: 1rem 0 1.25rem;
 }
 
+.tab-purpose-strip {
+    padding: 0.95rem 1.05rem;
+    border: 1px solid var(--panel-border);
+    border-left: 4px solid var(--accent);
+    background: var(--panel-bg);
+    border-radius: 14px;
+    margin: 0.85rem 0 1.1rem;
+}
+
 .takeaway-block {
     padding: 1rem 1.1rem;
     background: var(--accent-soft);
@@ -200,6 +209,20 @@ def render_research_module_intro(title: str, why_it_matters: str) -> None:
           <div class="module-kicker">Why this matters</div>
           <h3>{html.escape(title)}</h3>
           <p>{html.escape(why_it_matters)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_tab_purpose_strip(question: str, use_this_when: str, start_here: str) -> None:
+    st.markdown(
+        f"""
+        <div class="tab-purpose-strip">
+          <div class="module-kicker">Tab purpose</div>
+          <p><strong>Question:</strong> {html.escape(question)}</p>
+          <p><strong>Use this when:</strong> {html.escape(use_this_when)}</p>
+          <p><strong>Start here:</strong> {html.escape(start_here)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -329,6 +352,11 @@ with tab1:
         "Theory & Simulation",
         "Start with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold.",
         "Policy tightening matters when banks can keep deposit rates sticky while alternatives become more attractive.",
+    )
+    render_tab_purpose_strip(
+        "How does the deposits channel work in theory?",
+        "You want the mechanism before the empirical evidence or scenario close.",
+        "Start with the opening diagnostic, then read Q1 before the simulation panels.",
     )
     st.markdown(
         "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
@@ -645,6 +673,11 @@ with tab2:
         "Empirical Terminal",
         "Open with the signal board, then move from regime identification into event evidence, fear amplification, and propagation.",
         "The deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up.",
+    )
+    render_tab_purpose_strip(
+        "What does the selected sample say about deposits-channel stress?",
+        "You want the live evidence board before jumping back to theory or forward to scenarios.",
+        "Start with the signal board, then use the regime summary to anchor the sample.",
     )
     render_diagnostic_band(
         "Empirical opening",
@@ -1056,6 +1089,11 @@ with tab3:
         "Trace proxy evidence from deposits into the broader macro and credit system, then interpret the downstream pressure through the curve and credit lens.",
         "The deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive.",
     )
+    render_tab_purpose_strip(
+        "How do macro and credit proxies map back to the channel?",
+        "You want a cross-market interpretation after the empirical tab identifies pressure.",
+        "Begin with the proxy comparison, then read the curve and credit blocks.",
+    )
     render_diagnostic_band(
         "Macro opening",
         "This tab opens by comparing deposit migration proxies before translating them into curve and credit read-throughs.",
@@ -1295,6 +1333,11 @@ with tab4:
         "Work through preconditions, break, market interpretation, and counterfactual repair as a compact narrative arc.",
         "March 2023 broke when rate-sensitive funding met unrealized losses and the market treated the move as a confidence event.",
     )
+    render_tab_purpose_strip(
+        "What changed in the break, and what would have changed the outcome?",
+        "You want a narrative comparison between the observed episode and the counterfactual path.",
+        "Start with the break chronology, then use the counterfactual controls to test the story.",
+    )
     render_diagnostic_band(
         "Case opening",
         "The crisis narrative is organized as evidence, not just chronology: preconditions, break, market interpretation, then repair.",
@@ -1497,6 +1540,11 @@ with tab5:
         "Monitoring & Scenarios",
         "Close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last.",
         "The five-metric scorecard is an opening diagnostic, not a verdict.",
+    )
+    render_tab_purpose_strip(
+        "Which stress conditions should you monitor now?",
+        "You want a compact watchlist and scenario playbook at the end of the terminal.",
+        "Start with the scorecard, then read the playbook beneath the stress surfaces.",
     )
     render_diagnostic_band(
         "Monitoring opening",

@@ -180,30 +180,59 @@ def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> Non
     assert "if data.empty:" in content
 
 
-def test_guided_entry_orientation_preface_renders_selected_sample_context() -> None:
-    calls: list[tuple[str, bool]] = []
+def test_guided_entry_orientation_preface_is_wired_into_page_flow() -> None:
+    content = APP_SOURCE.read_text()
+    module = ast.parse(content)
 
-    class FakeStreamlit:
-        def markdown(self, body: str, unsafe_allow_html: bool = False) -> None:
-            calls.append((body, unsafe_allow_html))
-
-    render_reading_preface = _load_app_helper(
-        "render_reading_preface", {"st": FakeStreamlit(), "html": html, "pd": pd}
+    start_date_line = next(
+        node.lineno
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "start_date" for target in node.targets
+        )
+    )
+    end_date_line = next(
+        node.lineno
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "end_date" for target in node.targets)
+    )
+    render_preface_node = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and _call_name(node.value) == "render_reading_preface"
+    )
+    tabs_node = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Tuple) for target in node.targets)
+        and any(isinstance(target, ast.Name) and target.id == "tab1" for target in ast.walk(node))
     )
 
-    render_reading_preface(pd.Timestamp("2024-01-01"), pd.Timestamp("2024-03-31"))
+    assert "render_reading_preface(start_date, end_date)" in content
+    assert "How to read this terminal" in content
+    assert start_date_line < end_date_line < render_preface_node.lineno < tabs_node.lineno
+    render_preface_call = render_preface_node.value
+    assert isinstance(render_preface_call, ast.Call)
+    render_preface_args: list[str] = []
+    for arg in render_preface_call.args:
+        assert isinstance(arg, ast.Name)
+        render_preface_args.append(arg.id)
+    assert render_preface_args == ["start_date", "end_date"]
 
-    assert len(calls) == 1
-    body, allow_html = calls[0]
-    assert allow_html is True
-    assert '<div class="seminar-banner">' in body
-    assert "How to read this terminal" in body
-    assert "Start here:" in body
-    assert "selected sample" in body.lower()
-    assert "Sample context:" in body
-    assert "Jan 01, 2024" in body
-    assert "Mar 31, 2024" in body
-    assert "Question:" in body
+
+def test_tabs_include_orientation_strip_cues() -> None:
+    content = APP_SOURCE.read_text()
+
+    for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
+        block = _extract_tab_block(content, tab_name)
+        assert "render_tab_purpose_strip(" in block
+
+    assert content.count("render_tab_purpose_strip(") >= 5
 
 
 def test_macro_regime_matrix_labels_present() -> None:
