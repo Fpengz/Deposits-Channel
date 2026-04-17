@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import html
 import re
 from pathlib import Path
 
@@ -370,12 +371,50 @@ def test_visual_system_guardrail_anchors_are_present_in_app_source() -> None:
         assert anchor in content
 
 
-def test_app_defines_visual_system_helpers() -> None:
+def test_visual_system_helpers_render_semantic_html() -> None:
+    calls: list[tuple[str, bool]] = []
+
+    class FakeStreamlit:
+        def markdown(self, body: str, unsafe_allow_html: bool = False) -> None:
+            calls.append((body, unsafe_allow_html))
+
+    render_seminar_banner = _load_app_helper(
+        "render_seminar_banner", {"st": FakeStreamlit(), "html": html}
+    )
+    render_diagnostic_band = _load_app_helper(
+        "render_diagnostic_band", {"st": FakeStreamlit(), "html": html}
+    )
+
+    render_seminar_banner("Open <session>", "Framing & synthesis", "Answer <yes>")
+    render_diagnostic_band("Board", "Track the live read", "Use the scorecard first")
+
+    assert len(calls) == 2
+
+    banner_body, banner_allow_html = calls[0]
+    band_body, band_allow_html = calls[1]
+
+    assert banner_allow_html is True
+    assert '<div class="seminar-banner">' in banner_body
+    assert "Research Seminar Module" in banner_body
+    assert "Open &lt;session&gt;" in banner_body
+    assert "Framing &amp; synthesis" in banner_body
+    assert "<strong>Short answer:</strong> Answer &lt;yes&gt;" in banner_body
+
+    assert band_allow_html is True
+    assert '<div class="diagnostic-band">' in band_body
+    assert "Diagnostic Band" in band_body
+    assert "Board" in band_body
+    assert "Track the live read" in band_body
+    assert "<strong>Diagnostic note:</strong> Use the scorecard first" in band_body
+
+
+def test_tabs_use_seminar_banners_and_diagnostic_bands() -> None:
     content = APP_SOURCE.read_text()
 
-    for helper in [
-        "def render_seminar_banner(",
-        "def render_research_module_intro(",
-        "def render_takeaway_block(",
-    ]:
-        assert helper in content
+    assert content.count("render_seminar_banner(") >= 5
+    assert content.count("render_diagnostic_band(") >= 5
+
+    for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
+        block = _extract_tab_block(content, tab_name)
+        assert "render_seminar_banner(" in block
+        assert "render_diagnostic_band(" in block

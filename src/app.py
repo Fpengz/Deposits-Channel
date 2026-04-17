@@ -164,6 +164,25 @@ def render_seminar_banner(title: str, framing: str, short_answer: str) -> None:
     )
 
 
+def render_diagnostic_band(title: str, summary: str, note: str | None = None) -> None:
+    note_html = (
+        f'<p class="short-answer"><strong>Diagnostic note:</strong> {html.escape(note)}</p>'
+        if note
+        else ""
+    )
+    st.markdown(
+        f"""
+        <div class="diagnostic-band">
+          <div class="module-kicker">Diagnostic Band</div>
+          <h3>{html.escape(title)}</h3>
+          <p>{html.escape(summary)}</p>
+          {note_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_research_module_intro(title: str, why_it_matters: str) -> None:
     st.markdown(
         f"""
@@ -275,15 +294,23 @@ def _recent_change(series: pd.Series) -> tuple[float, int]:
 
 
 with tab1:
-    st.header("Theory & Simulation")
-    st.markdown(
-        "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
+    render_seminar_banner(
+        "Theory & Simulation",
+        "Start with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold.",
+        "Policy tightening matters when banks can keep deposit rates sticky while alternatives become more attractive.",
     )
-
-    st.subheader("Q1: What is the deposits channel mechanism?")
     st.markdown(
         "**Short answer:** policy tightening matters when banks can keep deposit rates sticky while alternative cash vehicles become more attractive."
     )
+    render_diagnostic_band(
+        "Opening diagnostic",
+        "The first read is the gap between rates, deposit pricing, and volume before the scenario surface expands.",
+        "The metric row below is the first live check on funding pressure and capital strain.",
+    )
+    st.markdown(
+        "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
+    )
+    st.subheader("Q1: What is the deposits channel mechanism?")
     st.markdown(
         "By the end of this section, the reader should know which assumptions make the system fragile and why."
     )
@@ -335,6 +362,11 @@ with tab1:
         bond_portfolio_ratio=0.6,
     )
 
+    render_diagnostic_band(
+        "Core metric band",
+        "This row condenses the live simulation into a quick read on policy, deposits, and the balance-sheet buffer.",
+        "Use it as the opening diagnostic before the scenario charts deepen the evidence.",
+    )
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Fed Funds Rate", f"{fed_funds_rate * 100:.2f}%")
     col2.metric("Deposit Rate", f"{dep_rate * 100:.2f}%", f"-{spread * 100:.2f}% spread")
@@ -562,7 +594,19 @@ with tab1:
     )
 
 with tab2:
-    st.header("Empirical Terminal")
+    render_seminar_banner(
+        "Empirical Terminal",
+        "Open with the signal board, then move from regime identification into event evidence, fear amplification, and propagation.",
+        "The deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up.",
+    )
+    st.markdown(
+        "**Short answer:** the deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up; the rest of the section checks whether that pattern behaves like a regime, a policy-event response, a fear amplifier, or a propagation channel."
+    )
+    render_diagnostic_band(
+        "Empirical opening",
+        "This tab starts with the live diagnostic question: are rate sensitivity and stress lining up into a channel regime?",
+        "The signal board below is the first synthesis point before the empirical tests fan out.",
+    )
     st.markdown(
         "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
     )
@@ -762,6 +806,11 @@ with tab2:
                         "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
                     )
 
+                    render_diagnostic_band(
+                        "Signal board",
+                        "The latest stress, beta, and relative performance summary gives the first regime read before the event tests continue.",
+                        "When the board turns more active, the seminar shifts from description to transmission evidence.",
+                    )
                     st.subheader("Q8: Which regime are we in?")
                     if channel_state == "Stressed":
                         regime_label = "Stress regime"
@@ -919,12 +968,21 @@ with tab2:
                 )
 
 with tab3:
-    st.header("Macro & Credit")
-    st.markdown(
-        "Trace proxy evidence from deposits into the broader macro and credit system: the opening comparison looks at bank-vs-MMF behavior, then the curve and credit sections interpret the downstream pressure."
+    render_seminar_banner(
+        "Macro & Credit",
+        "Trace proxy evidence from deposits into the broader macro and credit system, then interpret the downstream pressure through the curve and credit lens.",
+        "The deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive.",
     )
     st.markdown(
         "**Short answer:** the section traces proxy evidence suggesting pressure moves from deposits toward MMFs, then shows how the curve and credit read-throughs may reflect downstream stress; the deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive."
+    )
+    render_diagnostic_band(
+        "Macro opening",
+        "This tab opens by comparing deposit migration proxies before translating them into curve and credit read-throughs.",
+        "Use the regime matrix as the compact macro summary once the opening comparison lands.",
+    )
+    st.markdown(
+        "Trace proxy evidence from deposits into the broader macro and credit system: the opening comparison looks at bank-vs-MMF behavior, then the curve and credit sections interpret the downstream pressure."
     )
 
     if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
@@ -998,6 +1056,11 @@ with tab3:
         )
         st.plotly_chart(fig_slope, width="stretch")
 
+        render_diagnostic_band(
+            "Macro regime band",
+            "The matrix translates curve slope and credit stress into one compact read on whether the system is normal, squeezed, stressed, or in crisis.",
+            "Use this as the macro summary before the downstream credit section.",
+        )
         st.subheader("Q5: Which macro regime are we in?")
         regime_matrix = pd.DataFrame(
             [
@@ -1140,12 +1203,21 @@ with tab3:
         )
 
 with tab4:
-    st.header("Case Study: March 2023 Banking Stress")
-    st.markdown(
-        "We open this case as a compact narrative arc: preconditions, break, market interpretation, and counterfactual repair."
+    render_seminar_banner(
+        "Case Study: March 2023 Banking Stress",
+        "Work through preconditions, break, market interpretation, and counterfactual repair as a compact narrative arc.",
+        "March 2023 broke when rate-sensitive funding met unrealized losses and the market treated the move as a confidence event.",
     )
     st.markdown(
         "**Short answer:** March 2023 broke when rate-sensitive funding met unrealized losses, the market interpreted the move as a confidence event, and the counterfactuals ask what would have changed the outcome."
+    )
+    render_diagnostic_band(
+        "Case opening",
+        "The crisis narrative is organized as evidence, not just chronology: preconditions, break, market interpretation, then repair.",
+        "The counterfactuals below test which balance-sheet choices would have changed the outcome.",
+    )
+    st.markdown(
+        "We open this case as a compact narrative arc: preconditions, break, market interpretation, and counterfactual repair."
     )
     st.markdown("""
     March 2023 represented a 'nonlinear' shock where the Deposits Channel mechanism reached a breaking point 
@@ -1326,12 +1398,21 @@ with tab4:
         )
 
 with tab5:
-    st.header("Monitoring & Scenarios")
-    st.markdown(
-        "We close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last."
+    render_seminar_banner(
+        "Monitoring & Scenarios",
+        "Close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last.",
+        "The five-metric scorecard is an opening diagnostic, not a verdict.",
     )
     st.markdown(
         "**Short answer:** the five-metric scorecard is an opening diagnostic, not a verdict; it tells you whether the channel is live enough to justify the scenarios and playbook that follow."
+    )
+    render_diagnostic_band(
+        "Monitoring opening",
+        "The scorecard compresses stress, beta, curve, MMF pressure, and credit stress into one live reading before the scenarios and playbook.",
+        "Treat it as the first triage layer for the seminar close.",
+    )
+    st.markdown(
+        "We close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last."
     )
     monitoring_frame = pd.DataFrame()
     if not merged.empty:
