@@ -251,7 +251,7 @@ def render_reading_preface(
           <div class="module-kicker">How to read this terminal</div>
           <h2>How to read this terminal</h2>
           <p>Start here: read the opening mechanism, then use the selected sample in the sidebar as the common frame for the evidence below.</p>
-          <p>Sample context: the current sample runs from {html.escape(sample_start_label)} to {html.escape(sample_end_label)}. If a panel says the data are unavailable, treat that as a coverage note for this sample rather than a change in the underlying story.</p>
+          <p><strong>Selected sample:</strong> {html.escape(sample_start_label)} to {html.escape(sample_end_label)}. If a panel says the data are unavailable, treat that as a coverage note for this window rather than a change in the underlying story.</p>
           <p class="short-answer"><strong>Question:</strong> Which part of the deposits channel is under pressure in the selected sample?</p>
         </div>
         """,
@@ -273,6 +273,9 @@ st.markdown("""
 This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)** across multiple asset classes.
 Use the tabs below to explore the "Flow of Funds", Yield Curve interactions, and recent banking stress.
 """)
+st.caption(
+    "Read this next: Theory explains the mechanism; Empirical checks the selected sample; Monitoring closes the loop."
+)
 
 # Global data fetch (shared across tabs)
 with st.spinner("Fetching market data..."):
@@ -366,6 +369,9 @@ with tab1:
         "Opening diagnostic",
         "The first read is the gap between rates, deposit pricing, and volume before the scenario surface expands.",
         "The core metric band later in the tab turns that framing into live funding-pressure numbers.",
+    )
+    st.caption(
+        "Read this next: once the mechanism is clear, the simulation panels show how pass-through changes with market power and elasticity."
     )
     render_research_module_intro(
         "Q1: What is the deposits channel mechanism?",
@@ -904,6 +910,9 @@ with tab2:
                         "The latest stress, beta, and relative performance summary gives the first regime read before the event tests continue.",
                         "When the board turns more active, the seminar shifts from description to transmission evidence.",
                         body=render_signal_board_surface,
+                    )
+                    st.caption(
+                        "Read this next: if the signal board looks active, move to Q8 before the event study."
                     )
                     render_research_module_intro(
                         "Q8: Which regime are we in?",
@@ -1471,6 +1480,9 @@ with tab4:
                 "Q4: What would have changed the outcome?",
                 "The counterfactuals test whether the crisis was mostly about duration, stickiness, or concentration.",
             )
+            st.caption(
+                "Read this next: compare the counterfactuals, then use Monitoring & Scenarios for the live watchlist."
+            )
             st.markdown(
                 "We run simple counterfactuals to show which balance-sheet choices would have changed the outcome, not just softened the optics after the fact."
             )
@@ -1658,6 +1670,7 @@ with tab5:
             st.markdown(
                 "**What to notice:** the board matters most when stress, bank beta, curve, MMFs, and credit all point the same way; any split says the channel is still forming rather than fully settled."
             )
+            st.caption("If you only look at one chart, start with the scorecard.")
 
     render_diagnostic_band(
         "Monitoring opening",

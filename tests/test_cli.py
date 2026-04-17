@@ -235,6 +235,17 @@ def test_tabs_include_orientation_strip_cues() -> None:
     assert content.count("render_tab_purpose_strip(") >= 5
 
 
+def test_guided_entry_orientation_is_present_without_becoming_tutorial_heavy() -> None:
+    content = APP_SOURCE.read_text()
+
+    assert "How to read this terminal" in content
+    assert "Selected sample" in content
+    assert content.count("Read this next") >= 3
+    assert content.count("Read this next") <= 4
+    assert content.count("If you only look at one chart") == 1
+    assert content.count("Start here:") >= 2
+
+
 def test_macro_regime_matrix_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Regime Matrix" in content
