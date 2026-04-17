@@ -493,13 +493,16 @@ def build_terminal_driver_text(
             else:
                 driver_labels.append(f"{tab_label} {state_label}")
     if not driver_labels:
-        base = "Limited overlapping evidence across the live tabs."
+        return "The live read is tentative because overlapping evidence is still limited across the live tabs."
     elif len(driver_labels) == 1:
-        base = f"{driver_labels[0].capitalize()}."
+        base = f"The live read is being pulled most clearly by {driver_labels[0]}."
     else:
-        base = f"{driver_labels[0].capitalize()} and {driver_labels[1]}."
+        base = (
+            f"The live read is being pulled most clearly by {driver_labels[0]} "
+            f"and {driver_labels[1]}."
+        )
     if disagreement:
-        return f"{base[:-1]}, with mixed signals across the highest-weight tabs."
+        return f"{base[:-1]}, but the highest-weight tabs are still mixed."
     return base
 
 

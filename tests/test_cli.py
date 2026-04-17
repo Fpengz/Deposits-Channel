@@ -661,7 +661,7 @@ def test_visual_system_helpers_render_semantic_html() -> None:
     render_terminal_summary_band(
         "Transmission active but mixed",
         "Watch",
-        "Empirical transmission broadening and monitoring stable, with mixed signals across the highest-weight tabs.",
+        "The live read is being pulled most clearly by empirical transmission broadening and monitoring stable, but the highest-weight tabs are still mixed.",
         "Empirical Terminal for the live market evidence.",
         "Mixed signal across high-weight tabs",
     )

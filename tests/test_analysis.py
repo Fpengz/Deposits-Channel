@@ -476,9 +476,10 @@ def test_build_terminal_driver_text_references_dominant_tabs_and_disagreement():
 
     driver_text = build_terminal_driver_text(summary["tab_states"], summary["dominant_tabs"])
 
+    assert "the live read is being pulled" in driver_text.lower()
     assert "empirical transmission broadening" in driver_text.lower()
     assert "monitoring stable" in driver_text.lower()
-    assert "mixed" in driver_text.lower()
+    assert "highest-weight tabs are still mixed" in driver_text.lower()
 
 
 @pytest.mark.parametrize(
