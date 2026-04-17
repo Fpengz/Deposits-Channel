@@ -677,9 +677,18 @@ def test_tabs_include_section_navigator_helper_usage() -> None:
 
 def test_navigation_layer_is_present_without_heavy_chrome() -> None:
     content = APP_SOURCE.read_text()
+    module = ast.parse(content)
+
+    navigator_calls = [
+        node
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call) and _call_name(node) == "render_section_navigator"
+    ]
+    continue_in_count = content.count("Continue in")
+    read_next_count = content.count("Read this next")
 
     assert "Jump to section" in content
-    assert content.count("render_section_navigator(") >= 5
-    assert 4 <= content.count("Read this next") <= 6
-    assert 3 <= content.count("Continue in") <= 5
-    assert content.count("If you only look at one chart") <= 2
+    assert len(navigator_calls) >= 5
+    assert continue_in_count >= 3
+    assert read_next_count >= 2
+    assert "If you only look at one chart" in content

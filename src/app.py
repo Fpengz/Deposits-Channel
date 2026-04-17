@@ -788,13 +788,13 @@ with tab1:
 with tab2:
     render_seminar_banner(
         "Empirical Terminal",
-        "Open with the signal board, then move from regime identification into event evidence, fear amplification, and propagation.",
+        "Use the opening diagnostics to establish the live sample, then move from event evidence into fear amplification and propagation.",
         "The deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up.",
     )
     render_tab_purpose_strip(
         "What does the selected sample say about deposits-channel stress?",
         "You want the live evidence board before jumping back to theory or forward to scenarios.",
-        "Start with the signal board, then use the regime summary to anchor the sample.",
+        "Start with the opening diagnostic and the stress regime, then use the signal board as the first synthesis point.",
     )
     render_section_navigator(
         "Empirical Terminal",
@@ -812,13 +812,13 @@ with tab2:
     render_diagnostic_band(
         "Empirical opening",
         "This tab starts with the live diagnostic question: are rate sensitivity and stress lining up into a channel regime?",
-        "The signal board below is the first synthesis point before the empirical tests fan out.",
+        "The signal board below is the first synthesis point after the opening diagnostic and regime evidence are on the page.",
     )
     st.markdown(
-        "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
+        "We open the empirical tab as a research seminar with the live diagnostic and regime evidence first, then use the signal board to synthesize what the sample is implying before the later event, fear, and propagation sections."
     )
     st.markdown(
-        "Each section asks a market question, then answers it with data, with transitions that follow the evidence from the signal board to the downstream tests."
+        "Each section asks a market question, then answers it with data, with transitions that move from the opening diagnostics into the downstream empirical tests."
     )
 
     merged = pd.DataFrame()
