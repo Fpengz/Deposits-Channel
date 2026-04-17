@@ -1,4 +1,5 @@
 import html
+import re
 import warnings
 from collections.abc import Callable
 from datetime import date
@@ -135,6 +136,43 @@ VISUAL_SYSTEM_CSS = """
     margin: 0.85rem 0 1.1rem;
 }
 
+.section-navigator {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--panel-border);
+    background: linear-gradient(180deg, #fffdfa 0%, #f5f1ea 100%);
+    border-radius: 14px;
+    margin: 0.75rem 0 1rem;
+}
+
+.section-navigator p {
+    margin-bottom: 0.55rem;
+}
+
+.section-navigator__items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.section-navigator__link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid #bfd0c7;
+    color: var(--ink);
+    font-size: 0.88rem;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.section-navigator__link:hover {
+    background: #cfdfd6;
+    transform: translateY(-1px);
+}
+
 .takeaway-block {
     padding: 1rem 1.1rem;
     background: var(--accent-soft);
@@ -223,6 +261,41 @@ def render_tab_purpose_strip(question: str, use_this_when: str, start_here: str)
           <p><strong>Question:</strong> {html.escape(question)}</p>
           <p><strong>Use this when:</strong> {html.escape(use_this_when)}</p>
           <p><strong>Start here:</strong> {html.escape(start_here)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _slugify_section_label(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug or "section"
+
+
+def _section_anchor(tab_title: str, section_label: str) -> str:
+    return f"{_slugify_section_label(tab_title)}-{_slugify_section_label(section_label)}"
+
+
+def render_section_anchor(tab_title: str, section_label: str) -> None:
+    st.markdown(
+        f'<div id="{html.escape(_section_anchor(tab_title, section_label))}"></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_section_navigator(title: str, sections: list[str]) -> None:
+    # Later tasks will add the broader "Continue in" cues.
+    section_links = "".join(
+        f'<a class="section-navigator__link" href="#{_section_anchor(title, section)}">'
+        f"{html.escape(section)}</a>"
+        for section in sections
+    )
+    st.markdown(
+        f"""
+        <div class="section-navigator">
+          <div class="module-kicker">Jump to section</div>
+          <p><strong>{html.escape(title)}</strong></p>
+          <div class="section-navigator__items">{section_links}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -361,10 +434,22 @@ with tab1:
         "You want the mechanism before the empirical evidence or scenario close.",
         "Start with the opening diagnostic, then read Q1 before the simulation panels.",
     )
+    render_section_navigator(
+        "Theory & Simulation",
+        [
+            "Opening diagnostic",
+            "Q1 mechanism",
+            "Q2 sensitivity",
+            "Q3 rate paths",
+            "Q4 AOCI",
+            "Q5 destabilization",
+        ],
+    )
     st.markdown(
         "We begin with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold."
     )
 
+    render_section_anchor("Theory & Simulation", "Opening diagnostic")
     render_diagnostic_band(
         "Opening diagnostic",
         "The first read is the gap between rates, deposit pricing, and volume before the scenario surface expands.",
@@ -373,6 +458,7 @@ with tab1:
     st.caption(
         "Read this next: once the mechanism is clear, the simulation panels show how pass-through changes with market power and elasticity."
     )
+    render_section_anchor("Theory & Simulation", "Q1 mechanism")
     render_research_module_intro(
         "Q1: What is the deposits channel mechanism?",
         "This opening module states the mechanism clearly before the simulation turns it into visible pass-through and balance-sheet pressure.",
@@ -428,6 +514,7 @@ with tab1:
         bond_portfolio_ratio=0.6,
     )
 
+    render_section_anchor("Theory & Simulation", "Q2 sensitivity")
     render_research_module_intro(
         "Q2: How sensitive is the mechanism to assumptions?",
         "This module tests whether market power and depositor elasticity make the same rate shock bite harder or softer.",
@@ -581,6 +668,7 @@ with tab1:
         "**What to notice:** concentrated banks sit farther below full pass-through, so the policy shock is absorbed by depositors unevenly."
     )
 
+    render_section_anchor("Theory & Simulation", "Q3 rate paths")
     render_research_module_intro(
         "Q3: What happens under plausible rate paths?",
         "The path simulation shows that identical starting conditions can diverge quickly once rates and elasticity move together.",
@@ -616,6 +704,7 @@ with tab1:
         "**What to notice:** the same rate path can produce very different deposit trajectories once elasticity shifts the curve's steepness."
     )
 
+    render_section_anchor("Theory & Simulation", "Q4 AOCI")
     render_research_module_intro(
         "Q4: How do rate changes impact AOCI?",
         "Duration losses are the bridge between rates and capital; this module shows when mark-to-market pain arrives before deposits visibly run.",
@@ -642,6 +731,7 @@ with tab1:
         "**What to notice:** rate-path scenarios matter because bond losses can arrive even before deposit outflows fully show up."
     )
 
+    render_section_anchor("Theory & Simulation", "Q5 destabilization")
     render_research_module_intro(
         "Q5: When do outflows and AOCI become destabilizing?",
         "This threshold view shows how the channel tips from friction into stress once runoff and duration losses compound.",
@@ -685,6 +775,19 @@ with tab2:
         "You want the live evidence board before jumping back to theory or forward to scenarios.",
         "Start with the signal board, then use the regime summary to anchor the sample.",
     )
+    render_section_navigator(
+        "Empirical Terminal",
+        [
+            "Opening diagnostic",
+            "Q1 rate shocks",
+            "Q2 stress regime",
+            "Signal board",
+            "Q3 event study",
+            "Q5 fear amplification",
+            "Q6 propagation",
+        ],
+    )
+    render_section_anchor("Empirical Terminal", "Opening diagnostic")
     render_diagnostic_band(
         "Empirical opening",
         "This tab starts with the live diagnostic question: are rate sensitivity and stress lining up into a channel regime?",
@@ -724,6 +827,7 @@ with tab2:
                 "The selected timeframe leaves no overlapping observations, so the empirical board cannot be assembled."
             )
         else:
+            render_section_anchor("Empirical Terminal", "Q1 rate shocks")
             core_empirical_cols = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]
             required_empirical_factors = ["d_ff", "r_kbe", "r_iat", "r_spy"]
             data_full["d_ff"] = data_full["FF_Proxy"].diff()
@@ -844,6 +948,7 @@ with tab2:
                 st.plotly_chart(fig_rec, width="stretch")
 
                 # Q2. Stress Signal
+                render_section_anchor("Empirical Terminal", "Q2 stress regime")
                 render_research_module_intro(
                     "Q2: Is stress building in the system?",
                     "This module tests whether rates, volatility, and bank drawdowns are already accumulating into a channel-wide signal.",
@@ -905,6 +1010,7 @@ with tab2:
                             "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
                         )
 
+                    render_section_anchor("Empirical Terminal", "Signal board")
                     render_diagnostic_band(
                         "Signal board",
                         "The latest stress, beta, and relative performance summary gives the first regime read before the event tests continue.",
@@ -943,6 +1049,7 @@ with tab2:
                     )
 
                 # Q3. Policy Event Impact
+                render_section_anchor("Empirical Terminal", "Q3 event study")
                 render_research_module_intro(
                     "Q3: Do policy events create abnormal returns?",
                     "Event studies test whether FOMC dates produce footprints that are different from ordinary market noise.",
@@ -998,6 +1105,7 @@ with tab2:
                     st.plotly_chart(fig_beta, width="stretch")
 
                 # Q5. Fear Amplification
+                render_section_anchor("Empirical Terminal", "Q5 fear amplification")
                 render_research_module_intro(
                     "Q5: Does fear amplify the channel?",
                     "This split asks whether volatility makes the same rate shock more potent for bank returns.",
@@ -1031,6 +1139,7 @@ with tab2:
                     )
 
                 # Q6. Shock Propagation
+                render_section_anchor("Empirical Terminal", "Q6 propagation")
                 render_research_module_intro(
                     "Q6: How do shocks propagate over time?",
                     "Impulse responses show whether the channel diffuses quickly or keeps working through the system over multiple days.",
@@ -1103,6 +1212,16 @@ with tab3:
         "You want a cross-market interpretation after the empirical tab identifies pressure.",
         "Begin with the proxy comparison, then read the curve and credit blocks.",
     )
+    render_section_navigator(
+        "Macro & Credit",
+        [
+            "Opening comparison",
+            "Q1 deposit migration",
+            "Q2 macro regime",
+            "Q3 credit feedback",
+        ],
+    )
+    render_section_anchor("Macro & Credit", "Opening comparison")
     render_diagnostic_band(
         "Macro opening",
         "This tab opens by comparing deposit migration proxies before translating them into curve and credit read-throughs.",
@@ -1126,6 +1245,7 @@ with tab3:
         ]
 
         # Q1. Deposit Destination
+        render_section_anchor("Macro & Credit", "Q1 deposit migration")
         render_research_module_intro(
             "Q1: Where do deposits go when spreads widen?",
             "The first macro module asks whether deposit migration is visible in the bank-versus-MMF proxy relationship.",
@@ -1165,6 +1285,7 @@ with tab3:
         st.plotly_chart(fig_rel, width="stretch")
 
         # Q2. Macro Regime
+        render_section_anchor("Macro & Credit", "Q2 macro regime")
         render_research_module_intro(
             "Q2: What macro regime are we in?",
             "The curve regime anchors the macro story by showing whether the funding backdrop is normal, squeezed, or under stress.",
@@ -1234,6 +1355,7 @@ with tab3:
 
 with tab3:
     st.divider()
+    render_section_anchor("Macro & Credit", "Q3 credit feedback")
     render_research_module_intro(
         "Q3: Is credit stress feeding back into banks?",
         "Credit stress closes the loop by testing whether downstream pressure is showing up in bank returns.",
@@ -1347,6 +1469,17 @@ with tab4:
         "You want a narrative comparison between the observed episode and the counterfactual path.",
         "Start with the break chronology, then use the counterfactual controls to test the story.",
     )
+    render_section_navigator(
+        "Case Study",
+        [
+            "Opening case",
+            "Q1 conditions",
+            "Q2 interpretation",
+            "Q3 mechanism",
+            "Q4 counterfactuals",
+        ],
+    )
+    render_section_anchor("Case Study", "Opening case")
     render_diagnostic_band(
         "Case opening",
         "The crisis narrative is organized as evidence, not just chronology: preconditions, break, market interpretation, then repair.",
@@ -1369,6 +1502,7 @@ with tab4:
         crisis_data = merged[(merged.index >= crisis_start) & (merged.index <= crisis_end)]
 
         if not crisis_data.empty:
+            render_section_anchor("Case Study", "Q1 conditions")
             render_research_module_intro(
                 "Q1: What conditions preceded the break?",
                 "This opening module frames the crisis as a balance-sheet setup, not a one-day surprise.",
@@ -1420,6 +1554,7 @@ with tab4:
               further increasing their market power.
             """)
 
+            render_section_anchor("Case Study", "Q2 interpretation")
             render_research_module_intro(
                 "Q2: How did the market interpret the break?",
                 "This module shows how the selloff and divergence turned a balance-sheet event into a confidence story.",
@@ -1441,6 +1576,7 @@ with tab4:
             )
             st.plotly_chart(fig_div, width="stretch")
 
+            render_section_anchor("Case Study", "Q3 mechanism")
             render_research_module_intro(
                 "Q3: How does market interpretation map back to channel mechanics?",
                 "The waterfall turns the narrative back into mechanics by decomposing the visible damage into deposits, AOCI, and equity divergence.",
@@ -1476,6 +1612,7 @@ with tab4:
                 "**Waterfall framing:** the damage compounded in sequence as deposit flight exposed bond losses and then widened the equity penalty for regionals."
             )
 
+            render_section_anchor("Case Study", "Q4 counterfactuals")
             render_research_module_intro(
                 "Q4: What would have changed the outcome?",
                 "The counterfactuals test whether the crisis was mostly about duration, stickiness, or concentration.",
@@ -1558,6 +1695,16 @@ with tab5:
         "You want a compact watchlist and scenario playbook at the end of the terminal.",
         "Start with the scorecard, then read the playbook beneath the stress surfaces.",
     )
+    render_section_navigator(
+        "Monitoring & Scenarios",
+        [
+            "Signal scorecard",
+            "Scenario cards",
+            "Playbook",
+            "Audience takeaways",
+        ],
+    )
+    render_section_anchor("Monitoring & Scenarios", "Signal scorecard")
     st.markdown(
         "We close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last."
     )
@@ -1674,6 +1821,7 @@ with tab5:
         body=render_scorecard_surface,
     )
 
+    render_section_anchor("Monitoring & Scenarios", "Scenario cards")
     render_research_module_intro(
         "Scenario Cards",
         "The scenario module translates the scorecard into forward-looking checks on how the channel could behave next.",
@@ -1733,6 +1881,7 @@ with tab5:
         for title, research_takeaway, investor_takeaway, policy_takeaway in scenario_specs[2:]:
             render_scenario_card(title, research_takeaway, investor_takeaway, policy_takeaway)
 
+    render_section_anchor("Monitoring & Scenarios", "Playbook")
     render_research_module_intro(
         "If this, then that playbook",
         "The playbook turns the seminar close into a small set of decision rules that can be applied when the channel starts moving again.",
@@ -1776,6 +1925,7 @@ with tab5:
     render_takeaway_block(
         "Researchers should use the scorecard to classify the regime, investors should use the scenarios to pressure-test exposures, and policy users should use the playbook to decide when monitoring needs to tighten."
     )
+    render_section_anchor("Monitoring & Scenarios", "Audience takeaways")
     st.subheader("Audience Takeaways")
     st.markdown(
         "- Researchers: use the scorecard to classify the regime.\n"

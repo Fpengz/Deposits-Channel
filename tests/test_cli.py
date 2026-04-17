@@ -633,3 +633,13 @@ def test_future_navigation_anchors_are_not_missing_from_app_source() -> None:
 
     for anchor in ["Jump to section", "Read this next", "Continue in"]:
         assert anchor in content
+
+
+def test_tabs_include_section_navigator_helper_usage() -> None:
+    content = APP_SOURCE.read_text()
+
+    assert content.count("render_section_navigator(") >= 5
+
+    for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
+        block = _extract_tab_block(content, tab_name)
+        assert "render_section_navigator(" in block
