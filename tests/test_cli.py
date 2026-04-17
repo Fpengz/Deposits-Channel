@@ -27,13 +27,16 @@ def _load_app_helper(name: str, extra_globals: dict[str, object] | None = None):
 
 def _extract_tab_block(source: str, tab_name: str) -> str:
     module = ast.parse(source)
+    blocks: list[str] = []
     for node in module.body:
         if isinstance(node, ast.With):
             for item in node.items:
                 expr = item.context_expr
                 if isinstance(expr, ast.Name) and expr.id == tab_name:
                     lines = source.splitlines()
-                    return "\n".join(lines[node.lineno - 1 : node.end_lineno])
+                    blocks.append("\n".join(lines[node.lineno - 1 : node.end_lineno]))
+    if blocks:
+        return "\n\n".join(blocks)
     raise AssertionError(f"Could not find block for {tab_name}")
 
 
@@ -151,11 +154,16 @@ def test_macro_tab_uses_flow_of_funds_seminar_framing() -> None:
     content = Path("src/app.py").read_text()
     macro_block = _extract_tab_block(content, "tab3")
 
-    assert "Follow the funding flow" in macro_block
+    assert "Trace proxy evidence" in macro_block
     assert "**Short answer:**" in macro_block
     assert "proxy-based" in macro_block
     assert "interpretive" in macro_block
-    assert "downstream consequence" in macro_block
+    assert "downstream pressure" in macro_block
+    assert "Q3: Is credit stress feeding back into banks?" in macro_block
+    assert (
+        "Widening credit 'stress' indicates a contraction in bank lending supply as deposits leave the system."
+        in macro_block
+    )
 
 
 def test_case_study_counterfactual_labels_present() -> None:

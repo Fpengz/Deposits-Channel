@@ -820,10 +820,10 @@ with tab2:
 with tab3:
     st.header("Macro & Credit")
     st.markdown(
-        "Follow the funding flow from deposits into the broader macro and credit system: first deposits move toward MMFs, then the curve and credit conditions absorb the pressure."
+        "Trace proxy evidence from deposits into the broader macro and credit system: the opening comparison looks at bank-vs-MMF behavior, then the curve and credit sections interpret the downstream pressure."
     )
     st.markdown(
-        "**Short answer:** the pressure moves from deposits to MMFs, then into the curve, and finally into credit conditions; the deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive."
+        "**Short answer:** the section traces proxy evidence suggesting pressure moves from deposits toward MMFs, then shows how the curve and credit read-throughs may reflect downstream stress; the deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive."
     )
 
     if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
