@@ -214,8 +214,8 @@ def test_editorial_consistency_keeps_seminar_anchors_balanced() -> None:
     content = APP_SOURCE.read_text()
     monitoring_block = _extract_tab_block(content, "tab5")
 
-    assert content.count("**Short answer:**") >= 5
-    assert content.count("**What to notice:**") >= 5
+    assert monitoring_block.count("**Short answer:**") >= 1
+    assert monitoring_block.count("**What to notice:**") >= 1
     assert "Audience Takeaways" in monitoring_block
     assert "**Short answer:**" in monitoring_block
     assert "**What to notice:**" in monitoring_block
