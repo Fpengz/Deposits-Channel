@@ -614,7 +614,7 @@ with tab2:
                 )
                 if stress.dropna().empty:
                     st.warning(
-                        "The chosen window does not yet produce a stable stress composite, so the downstream empirical reading stays tentative."
+                        "The empirical board and stress composite could not be assembled for this sample, so the remaining empirical sections are omitted."
                     )
                 else:
                     threshold = stress.quantile(0.95)

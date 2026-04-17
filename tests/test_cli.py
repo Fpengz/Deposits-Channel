@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import numpy as np
@@ -97,24 +98,29 @@ def test_empirical_terminal_reads_like_research_seminar() -> None:
     content = Path("src/app.py").read_text()
     empirical_block = _extract_tab_block(content, "tab2")
 
-    assert (
-        "We open the empirical tab as a research seminar: first the signal board, then regime identification, event evidence, fear amplification, and propagation."
-        in empirical_block
-    )
     assert "**Short answer:**" in empirical_block
-    assert empirical_block.index("Signal Board") < empirical_block.index(
-        "Q8: Which regime are we in?"
-    )
-    assert empirical_block.index("Q8: Which regime are we in?") < empirical_block.index(
-        "Q3: Do policy events create abnormal returns?"
-    )
-    assert empirical_block.index(
-        "Q3: Do policy events create abnormal returns?"
-    ) < empirical_block.index("Q5: Does fear amplify the channel?")
-    assert empirical_block.index("Q5: Does fear amplify the channel?") < empirical_block.index(
-        "Q6: How do shocks propagate over time?"
-    )
+    assert "research seminar" in empirical_block
+    assert "signal board" in empirical_block
+
+    ordered_markers = [
+        "Q1: Are banks sensitive to rate shocks?",
+        "Q2: Is stress building in the system?",
+        "Signal Board",
+        "Q8: Which regime are we in?",
+        "Q3: Do policy events create abnormal returns?",
+        "Q5: Does fear amplify the channel?",
+        "Q6: How do shocks propagate over time?",
+        "Takeaway",
+    ]
+    positions = [empirical_block.index(marker) for marker in ordered_markers]
+    assert positions == sorted(positions)
+
     assert "The selected timeframe leaves no overlapping observations" in empirical_block
+    assert re.search(
+        r"empirical board and stress composite.*(?:omitted|unavailable)",
+        empirical_block,
+        re.IGNORECASE | re.DOTALL,
+    )
 
 
 def test_empirical_terminal_keeps_mmf_out_of_core_dropna_path() -> None:
