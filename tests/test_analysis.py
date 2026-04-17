@@ -5,6 +5,7 @@ from src.analysis import (
     build_beta_heatmap,
     build_combined_stress_grid,
     build_stress_index,
+    build_terminal_driver_text,
     calculate_bond_portfolio_loss,
     calculate_correlation_matrix,
     calculate_cross_correlation,
@@ -15,12 +16,18 @@ from src.analysis import (
     calculate_returns,
     calculate_rolling_beta,
     check_stationarity,
+    classify_case_study_state,
     classify_channel_state,
     classify_curve_regime,
+    classify_macro_credit_state,
+    classify_monitoring_state,
+    classify_theory_state,
     detect_monetary_regimes,
     estimate_var_forecast,
     event_study_car,
+    resolve_action_posture,
     rolling_zscore,
+    rollup_terminal_state,
     run_monte_carlo_simulation,
     run_ols_regression,
     scenario_expectations,
@@ -297,3 +304,190 @@ def test_scenario_expectations_higher_for_longer():
 def test_scenario_expectations_unknown_name():
     with pytest.raises(ValueError, match="Unknown scenario: Not a scenario"):
         scenario_expectations("Not a scenario")
+
+
+def test_classify_theory_state_thresholds():
+    assert classify_theory_state(liquidity_proxy=91.0, stress_share=0.35) == "Fragility elevated"
+    assert classify_theory_state(liquidity_proxy=97.5, stress_share=0.10) == "Fragility contained"
+
+
+def test_classify_theory_state_handles_missing_inputs():
+    assert classify_theory_state(liquidity_proxy=np.nan, stress_share=0.15) == "Insufficient data"
+
+
+def test_classify_macro_credit_state_thresholds():
+    assert (
+        classify_macro_credit_state(
+            curve_regime="Inverted",
+            mmf_relative=-0.08,
+            credit_stress_change=0.04,
+        )
+        == "Transmission widening"
+    )
+    assert (
+        classify_macro_credit_state(
+            curve_regime="Flat",
+            mmf_relative=-0.03,
+            credit_stress_change=0.01,
+        )
+        == "Spillover building"
+    )
+    assert (
+        classify_macro_credit_state(
+            curve_regime="Normal",
+            mmf_relative=0.02,
+            credit_stress_change=-0.01,
+        )
+        == "Spillover contained"
+    )
+
+
+def test_classify_case_study_state_thresholds():
+    assert (
+        classify_case_study_state(
+            deposit_outflow=18.0,
+            aoci_loss=12.0,
+            equity_divergence=15.0,
+        )
+        == "Analog relevance high"
+    )
+    assert (
+        classify_case_study_state(
+            deposit_outflow=8.0,
+            aoci_loss=6.0,
+            equity_divergence=5.0,
+        )
+        == "Analog relevance moderate"
+    )
+    assert (
+        classify_case_study_state(
+            deposit_outflow=2.0,
+            aoci_loss=1.0,
+            equity_divergence=1.5,
+        )
+        == "Analog relevance low"
+    )
+
+
+def test_classify_monitoring_state_thresholds():
+    assert (
+        classify_monitoring_state(
+            stress_value=1.4,
+            bank_beta=-0.45,
+            curve_regime="Inverted",
+            mmf_pressure="Pressure building",
+            credit_stress="Stress rising",
+        )
+        == "Escalation risk high"
+    )
+    assert (
+        classify_monitoring_state(
+            stress_value=0.8,
+            bank_beta=-0.15,
+            curve_regime="Flat",
+            mmf_pressure="Pressure easing",
+            credit_stress="Stress easing",
+        )
+        == "Monitoring elevated"
+    )
+    assert (
+        classify_monitoring_state(
+            stress_value=0.2,
+            bank_beta=-0.02,
+            curve_regime="Normal",
+            mmf_pressure="Pressure easing",
+            credit_stress="Stress easing",
+        )
+        == "Monitoring stable"
+    )
+
+
+def test_rollup_terminal_state_escalates_when_live_tabs_align():
+    summary = rollup_terminal_state(
+        {
+            "Theory": "Fragility elevated",
+            "Empirical": "Transmission broadening",
+            "Macro & Credit": "Transmission widening",
+            "Case Study": "Analog relevance high",
+            "Monitoring": "Escalation risk high",
+        }
+    )
+
+    assert summary["overall_terminal_state"] == "Transmission risk elevated"
+    assert summary["action_posture"] == "Escalate"
+    assert summary["dominant_tabs"][:2] == ["Empirical", "Monitoring"]
+
+
+def test_rollup_terminal_state_maps_watch_posture_for_mixed_signals():
+    summary = rollup_terminal_state(
+        {
+            "Theory": "Fragility elevated",
+            "Empirical": "Transmission active",
+            "Macro & Credit": "Spillover contained",
+            "Case Study": "Analog relevance moderate",
+            "Monitoring": "Monitoring stable",
+        }
+    )
+
+    assert summary["overall_terminal_state"] == "Transmission active but mixed"
+    assert summary["action_posture"] == "Watch"
+
+
+def test_rollup_terminal_state_handles_low_pressure():
+    summary = rollup_terminal_state(
+        {
+            "Theory": "Fragility contained",
+            "Empirical": "Transmission dormant",
+            "Macro & Credit": "Spillover contained",
+            "Case Study": "Analog relevance low",
+            "Monitoring": "Monitoring stable",
+        }
+    )
+
+    assert summary["overall_terminal_state"] == "Transmission dormant"
+    assert summary["action_posture"] == "Routine"
+
+
+def test_rollup_terminal_state_surfaces_conflicting_high_weight_tabs():
+    summary = rollup_terminal_state(
+        {
+            "Theory": "Fragility elevated",
+            "Empirical": "Transmission broadening",
+            "Macro & Credit": "Spillover building",
+            "Case Study": "Analog relevance moderate",
+            "Monitoring": "Monitoring stable",
+        }
+    )
+
+    assert summary["overall_terminal_state"] == "Transmission mixed but elevated"
+    assert summary["confidence_note"] == "Mixed signal across high-weight tabs"
+
+
+def test_build_terminal_driver_text_references_dominant_tabs_and_disagreement():
+    summary = rollup_terminal_state(
+        {
+            "Theory": "Fragility elevated",
+            "Empirical": "Transmission broadening",
+            "Macro & Credit": "Spillover contained",
+            "Case Study": "Analog relevance moderate",
+            "Monitoring": "Monitoring stable",
+        }
+    )
+
+    driver_text = build_terminal_driver_text(summary["tab_states"], summary["dominant_tabs"])
+
+    assert "empirical transmission broadening" in driver_text.lower()
+    assert "monitoring stable" in driver_text.lower()
+    assert "mixed" in driver_text.lower()
+
+
+@pytest.mark.parametrize(
+    ("overall_state", "expected_posture"),
+    [
+        ("Transmission dormant", "Routine"),
+        ("Transmission active but mixed", "Watch"),
+        ("Transmission risk elevated", "Escalate"),
+    ],
+)
+def test_resolve_action_posture_maps_expected_ranges(overall_state, expected_posture):
+    assert resolve_action_posture(overall_state, disagreement=False) == expected_posture

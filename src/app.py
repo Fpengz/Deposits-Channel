@@ -15,6 +15,7 @@ try:
         build_beta_heatmap,
         build_combined_stress_grid,
         build_stress_index,
+        build_terminal_driver_text,
         calculate_bond_portfolio_loss,
         calculate_correlation_matrix,
         calculate_cross_correlation,
@@ -24,9 +25,14 @@ try:
         calculate_returns,
         calculate_rolling_beta,
         calculate_yield_curve_slope,
+        classify_case_study_state,
         classify_channel_state,
         classify_curve_regime,
+        classify_macro_credit_state,
+        classify_monitoring_state,
+        classify_theory_state,
         event_study_car,
+        rollup_terminal_state,
         run_monte_carlo_simulation,
         run_ols_regression,
         scenario_expectations,
@@ -53,6 +59,7 @@ except ImportError:
         build_beta_heatmap,
         build_combined_stress_grid,
         build_stress_index,
+        build_terminal_driver_text,
         calculate_bond_portfolio_loss,
         calculate_correlation_matrix,
         calculate_cross_correlation,
@@ -62,9 +69,14 @@ except ImportError:
         calculate_returns,
         calculate_rolling_beta,
         calculate_yield_curve_slope,
+        classify_case_study_state,
         classify_channel_state,
         classify_curve_regime,
+        classify_macro_credit_state,
+        classify_monitoring_state,
+        classify_theory_state,
         event_study_car,
+        rollup_terminal_state,
         run_monte_carlo_simulation,
         run_ols_regression,
         scenario_expectations,
@@ -212,6 +224,28 @@ VISUAL_SYSTEM_CSS = """
     font-weight: 600;
     color: var(--ink);
 }
+
+.summary-band {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--panel-border);
+    background: linear-gradient(180deg, #f7f3ec 0%, #efebe2 100%);
+    border-radius: 16px;
+    margin: 0.8rem 0 1.15rem;
+}
+
+.state-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid #bfd0c7;
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-size: 0.88rem;
+    line-height: 1.2;
+    margin-top: 0.4rem;
+}
 </style>
 """
 
@@ -286,6 +320,21 @@ def render_tab_purpose_strip(question: str, use_this_when: str, start_here: str)
     )
 
 
+def render_state_label(tab_name: str, state: str, note: str | None = None) -> None:
+    note_html = f"<p>{html.escape(note)}</p>" if note else ""
+    st.markdown(
+        f"""
+        <div class="tab-purpose-strip">
+          <div class="module-kicker">Tab state</div>
+          <p><strong>{html.escape(tab_name)}:</strong></p>
+          <div class="state-pill">{html.escape(state)}</div>
+          {note_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _slugify_section_label(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug or "section"
@@ -331,6 +380,29 @@ def render_takeaway_block(text: str) -> None:
     )
 
 
+def render_terminal_summary_band(
+    overall_terminal_state: str,
+    action_posture: str,
+    driver_text: str,
+    read_next: str,
+    confidence_note: str,
+) -> None:
+    st.markdown(
+        f"""
+        <div class="summary-band">
+          <div class="module-kicker">Decision Layer</div>
+          <h3>Top summary</h3>
+          <p><strong>Overall read:</strong> {html.escape(overall_terminal_state)}</p>
+          <p><strong>Action posture:</strong> {html.escape(action_posture)}</p>
+          <p><strong>What is driving this:</strong> {html.escape(driver_text)}</p>
+          <p><strong>Where to read next:</strong> {html.escape(read_next)}</p>
+          <p><strong>Confidence note:</strong> {html.escape(confidence_note)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_reading_preface(
     sample_start: date | pd.Timestamp, sample_end: date | pd.Timestamp
 ) -> None:
@@ -358,6 +430,13 @@ st.sidebar.divider()
 st.sidebar.subheader("Global Timeframe")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2018-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
+st.sidebar.header("Simulation Parameters")
+fed_funds_rate = st.sidebar.slider("Fed Funds Rate (%)", 0.0, 10.0, 5.0, 0.25) / 100.0
+market_power = st.sidebar.slider("Bank Market Power (0 to 1)", 0.0, 1.0, 0.5, 0.1)
+elasticity = st.sidebar.slider("Depositor Elasticity", 1.0, 20.0, 10.0, 1.0)
+baseline_rate = st.sidebar.slider("Baseline Rate (%)", 0.0, 10.0, 2.0, 0.25) / 100.0
+duration = st.sidebar.slider("Bond Portfolio Duration (yrs)", 1.0, 10.0, 5.0, 0.5)
+base_volume = 10000.0
 
 render_reading_preface(start_date, end_date)
 st.markdown("""
@@ -378,17 +457,6 @@ with st.spinner("Fetching market data..."):
     mmf_proxy = get_proxy_mmf()
     tnx_proxy = get_proxy_10y_yield()
     lqd_proxy = get_proxy_credit_ig()
-
-# 5-Tab Structure (Question-Driven)
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    [
-        "Theory & Simulation",
-        "Empirical Terminal",
-        "Macro & Credit",
-        "Case Study",
-        "Monitoring & Scenarios",
-    ]
-)
 
 
 def _build_recent_stress_series(frame: pd.DataFrame) -> pd.Series:
@@ -441,11 +509,270 @@ def _recent_change(series: pd.Series) -> tuple[float, int]:
     return np.nan, 0
 
 
+# Decision-layer state assembly
+dep_rate = calculate_deposit_rate(fed_funds_rate, market_power)
+spread = fed_funds_rate - dep_rate
+volume = calculate_deposit_volume(base_volume, spread, elasticity)
+bond_loss, liquidity_proxy = calculate_liquidity_proxy(
+    volume=volume,
+    base_volume=base_volume,
+    current_rate=fed_funds_rate,
+    baseline_rate=baseline_rate,
+    duration=duration,
+    bond_portfolio_ratio=0.6,
+)
+theory_outflow_share = max(base_volume - volume, 0.0) / base_volume
+theory_aoci_share = abs(bond_loss) / base_volume
+theory_state = classify_theory_state(
+    liquidity_proxy=liquidity_proxy,
+    stress_share=theory_outflow_share + theory_aoci_share,
+)
+
+merged = pd.DataFrame()
+empirical_state = "Insufficient data"
+macro_state = "Insufficient data"
+case_state = "Insufficient data"
+monitoring_state = "Insufficient data"
+mmf_relative = np.nan
+latest_stress = np.nan
+latest_bank_beta = np.nan
+curve_state = None
+mmf_state = None
+credit_state = None
+
+if (
+    not ff_proxy.empty
+    and not kbe_proxy.empty
+    and not iat_proxy.empty
+    and not spy_proxy.empty
+    and not vix_proxy.empty
+):
+    merged = (
+        ff_proxy.join(kbe_proxy, lsuffix="_ff", rsuffix="_kbe")
+        .join(iat_proxy, rsuffix="_iat")
+        .join(spy_proxy, rsuffix="_spy")
+        .join(vix_proxy, rsuffix="_vix")
+        .dropna()
+    )
+    merged.columns = ["FF_Proxy", "KBE", "IAT", "SPY", "VIX"]
+
+selected_monitoring_frame = pd.DataFrame()
+if not merged.empty:
+    selected_monitoring_frame = merged[
+        (merged.index >= pd.to_datetime(start_date)) & (merged.index <= pd.to_datetime(end_date))
+    ].copy()
+
+if not selected_monitoring_frame.empty:
+    selected_monitoring_frame["d_ff"] = selected_monitoring_frame["FF_Proxy"].diff()
+    selected_monitoring_frame["r_kbe"] = selected_monitoring_frame["KBE"].pct_change()
+    selected_monitoring_frame["r_vix"] = calculate_returns(selected_monitoring_frame["VIX"])
+
+    recent_stress_series = _build_recent_stress_series(selected_monitoring_frame)
+    if not recent_stress_series.empty:
+        latest_stress = recent_stress_series.iloc[-1]
+
+    beta_frame = selected_monitoring_frame[["FF_Proxy", "KBE", "r_kbe", "d_ff"]].dropna()
+    beta_value, _ = _recent_beta_regime(beta_frame)
+    if beta_value is not None:
+        latest_bank_beta = beta_value
+
+    if not mmf_proxy.empty:
+        mmf_signal_frame = selected_monitoring_frame[["KBE"]].copy()
+        mmf_signal_frame["MMF"] = np.asarray(
+            mmf_proxy.reindex(selected_monitoring_frame.index)
+        ).reshape(-1)
+        mmf_relative_series = (mmf_signal_frame["KBE"] / mmf_signal_frame["MMF"]).dropna()
+        if not mmf_relative_series.empty:
+            mmf_relative = mmf_relative_series.iloc[-1] / mmf_relative_series.iloc[0] - 1
+
+    empirical_signal = classify_channel_state(
+        stress_value=latest_stress,
+        bank_beta=latest_bank_beta,
+        mmf_relative=mmf_relative,
+    )
+    empirical_state_map = {
+        "Dormant": "Transmission dormant",
+        "Active": "Transmission active",
+        "Stressed": "Transmission broadening",
+        "Insufficient data": "Insufficient data",
+    }
+    empirical_state = empirical_state_map.get(empirical_signal, "Insufficient data")
+
+if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
+    macro_merged = (
+        ff_proxy.join(mmf_proxy, lsuffix="_ff", rsuffix="_mmf")
+        .join(tnx_proxy, rsuffix="_tnx")
+        .join(kbe_proxy, rsuffix="_kbe")
+        .dropna()
+    )
+    macro_merged.columns = ["FF_Proxy", "MMF_Price", "Ten_Year", "KBE"]
+    macro_data = macro_merged[
+        (macro_merged.index >= pd.to_datetime(start_date))
+        & (macro_merged.index <= pd.to_datetime(end_date))
+    ].copy()
+    if not macro_data.empty:
+        macro_data["Slope"] = calculate_yield_curve_slope(
+            macro_data["Ten_Year"], macro_data["FF_Proxy"]
+        )
+        curve_regimes = classify_curve_regime(macro_data["Slope"]).dropna()
+        if not curve_regimes.empty:
+            curve_state = curve_regimes.iloc[-1]
+        macro_mmf_relative = macro_data["KBE"] / macro_data["MMF_Price"]
+        macro_mmf_change, _ = _recent_change(macro_mmf_relative)
+
+        credit_stress_change = np.nan
+        if not lqd_proxy.empty:
+            credit_macro = ff_proxy.join(lqd_proxy, lsuffix="_ff", rsuffix="_lqd").dropna()
+            credit_macro.columns = ["FF_Proxy", "Credit_Price"]
+            credit_macro = credit_macro[
+                (credit_macro.index >= pd.to_datetime(start_date))
+                & (credit_macro.index <= pd.to_datetime(end_date))
+            ].copy()
+            if not credit_macro.empty:
+                credit_stress_change, _ = _recent_change(credit_macro["Credit_Price"])
+                credit_stress_change = -credit_stress_change
+
+        macro_state = classify_macro_credit_state(
+            curve_regime=curve_state,
+            mmf_relative=macro_mmf_change,
+            credit_stress_change=credit_stress_change,
+        )
+
+if not merged.empty:
+    crisis_data = merged[
+        (merged.index >= pd.to_datetime("2023-02-01"))
+        & (merged.index <= pd.to_datetime("2023-05-01"))
+    ].copy()
+    if not crisis_data.empty:
+        kbe_norm = crisis_data["KBE"] / crisis_data["KBE"].iloc[0]
+        iat_norm = crisis_data["IAT"] / crisis_data["IAT"].iloc[0]
+        deposit_outflow = max(0.0, (1.0 - kbe_norm.min()) * 100)
+        crisis_rate_change = (
+            crisis_data["FF_Proxy"].iloc[-1] - crisis_data["FF_Proxy"].iloc[0]
+        ) / 100.0
+        crisis_bond_loss = calculate_bond_portfolio_loss(
+            base_value=60.0,
+            rate_change=crisis_rate_change,
+            duration=duration,
+        )
+        aoci_loss = abs(crisis_bond_loss)
+        equity_divergence = max(0.0, (kbe_norm.iloc[-1] - iat_norm.iloc[-1]) * 100)
+        case_state = classify_case_study_state(
+            deposit_outflow=deposit_outflow,
+            aoci_loss=aoci_loss,
+            equity_divergence=equity_divergence,
+        )
+
+if not selected_monitoring_frame.empty:
+    if not ff_proxy.empty and not tnx_proxy.empty:
+        curve_frame = ff_proxy.join(tnx_proxy, lsuffix="_ff", rsuffix="_tnx").dropna()
+        curve_frame.columns = ["FF_Proxy", "Ten_Year"]
+        curve_frame = curve_frame[
+            (curve_frame.index >= pd.to_datetime(start_date))
+            & (curve_frame.index <= pd.to_datetime(end_date))
+        ].copy()
+        if not curve_frame.empty:
+            latest_curve_slope = calculate_yield_curve_slope(
+                curve_frame["Ten_Year"], curve_frame["FF_Proxy"]
+            )
+            curve_regimes = classify_curve_regime(latest_curve_slope).dropna()
+            if not curve_regimes.empty:
+                curve_state = curve_regimes.iloc[-1]
+
+    if not ff_proxy.empty and not mmf_proxy.empty:
+        mmf_frame = ff_proxy.join(mmf_proxy, lsuffix="_ff", rsuffix="_mmf").dropna()
+        mmf_frame.columns = ["FF_Proxy", "MMF_Price"]
+        mmf_frame = mmf_frame[
+            (mmf_frame.index >= pd.to_datetime(start_date))
+            & (mmf_frame.index <= pd.to_datetime(end_date))
+        ].copy()
+        mmf_trend, _ = _recent_change(mmf_frame["MMF_Price"])
+        if not np.isnan(mmf_trend):
+            mmf_state = "Pressure building" if mmf_trend > 0 else "Pressure easing"
+
+    if not ff_proxy.empty and not lqd_proxy.empty:
+        credit_frame = ff_proxy.join(lqd_proxy, lsuffix="_ff", rsuffix="_lqd").dropna()
+        credit_frame.columns = ["FF_Proxy", "Credit_Price"]
+        credit_frame = credit_frame[
+            (credit_frame.index >= pd.to_datetime(start_date))
+            & (credit_frame.index <= pd.to_datetime(end_date))
+        ].copy()
+        credit_trend, _ = _recent_change(credit_frame["Credit_Price"])
+        if not np.isnan(credit_trend):
+            credit_trend = -credit_trend
+            credit_state = "Stress rising" if credit_trend > 0 else "Stress easing"
+
+    monitoring_state = classify_monitoring_state(
+        stress_value=latest_stress,
+        bank_beta=latest_bank_beta,
+        curve_regime=curve_state,
+        mmf_pressure=mmf_state,
+        credit_stress=credit_state,
+    )
+
+terminal_state_summary = rollup_terminal_state(
+    {
+        "Theory": theory_state,
+        "Empirical": empirical_state,
+        "Macro & Credit": macro_state,
+        "Case Study": case_state,
+        "Monitoring": monitoring_state,
+    }
+)
+
+dominant_tab = (
+    terminal_state_summary["dominant_tabs"][0] if terminal_state_summary["dominant_tabs"] else None
+)
+read_next_map = {
+    "Theory": "Theory & Simulation for the structural mechanism.",
+    "Empirical": "Empirical Terminal for the live market evidence.",
+    "Macro & Credit": "Macro & Credit for the spillover read-through.",
+    "Case Study": "Case Study for the March 2023 analog.",
+    "Monitoring": "Monitoring & Scenarios for the live watchlist.",
+}
+if dominant_tab is None:
+    read_next = "Empirical Terminal for the first live regime check."
+else:
+    read_next = read_next_map.get(
+        dominant_tab, "Empirical Terminal for the first live regime check."
+    )
+terminal_state_summary["driver_text"] = build_terminal_driver_text(
+    terminal_state_summary["tab_states"],
+    terminal_state_summary["dominant_tabs"],
+    disagreement=terminal_state_summary["confidence_note"]
+    == "Mixed signal across high-weight tabs",
+)
+
+render_terminal_summary_band(
+    terminal_state_summary["overall_terminal_state"],
+    terminal_state_summary["action_posture"],
+    terminal_state_summary["driver_text"],
+    read_next,
+    terminal_state_summary["confidence_note"],
+)
+
+# 5-Tab Structure (Question-Driven)
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [
+        "Theory & Simulation",
+        "Empirical Terminal",
+        "Macro & Credit",
+        "Case Study",
+        "Monitoring & Scenarios",
+    ]
+)
+
+
 with tab1:
     render_seminar_banner(
         "Theory & Simulation",
         "Start with the mechanism, then move through pass-through, deposit sensitivity, scenarios, and the destabilization threshold.",
         "Policy tightening matters when banks can keep deposit rates sticky while alternatives become more attractive.",
+    )
+    render_state_label(
+        "Theory",
+        theory_state,
+        "This state summarizes whether the current simulation parameters imply a benign or fragile funding setup.",
     )
     render_tab_purpose_strip(
         "How does the deposits channel work in theory?",
@@ -507,30 +834,6 @@ with tab1:
         "The next step is pass-through: how much of a policy move reaches deposit pricing before the volume response begins."
     )
     st.divider()
-
-    # Sidebar for simulation controls
-    st.sidebar.header("Simulation Parameters")
-    fed_funds_rate = st.sidebar.slider("Fed Funds Rate (%)", 0.0, 10.0, 5.0, 0.25) / 100.0
-    market_power = st.sidebar.slider("Bank Market Power (0 to 1)", 0.0, 1.0, 0.5, 0.1)
-    elasticity = st.sidebar.slider("Depositor Elasticity", 1.0, 20.0, 10.0, 1.0)
-    baseline_rate = st.sidebar.slider("Baseline Rate (%)", 0.0, 10.0, 2.0, 0.25) / 100.0
-    duration = st.sidebar.slider("Bond Portfolio Duration (yrs)", 1.0, 10.0, 5.0, 0.5)
-    base_volume = 10000.0
-
-    # Calculate theoretical values
-    dep_rate = calculate_deposit_rate(fed_funds_rate, market_power)
-    spread = fed_funds_rate - dep_rate
-    volume = calculate_deposit_volume(base_volume, spread, elasticity)
-
-    # AOCI Calculation
-    bond_loss, liquidity_proxy = calculate_liquidity_proxy(
-        volume=volume,
-        base_volume=base_volume,
-        current_rate=fed_funds_rate,
-        baseline_rate=baseline_rate,
-        duration=duration,
-        bond_portfolio_ratio=0.6,
-    )
 
     render_section_anchor("Theory & Simulation", "Q2 sensitivity")
     render_research_module_intro(
@@ -791,6 +1094,11 @@ with tab2:
         "Use the opening diagnostics to establish the live sample, then move from event evidence into fear amplification and propagation.",
         "The deposits channel is clearest when rate shocks, volatility, and bank drawdowns line up.",
     )
+    render_state_label(
+        "Empirical",
+        empirical_state,
+        "This state summarizes the live market sample using stress, beta, and bank-versus-MMF signals.",
+    )
     render_tab_purpose_strip(
         "What does the selected sample say about deposits-channel stress?",
         "You want the live evidence board before jumping back to theory or forward to scenarios.",
@@ -1028,7 +1336,7 @@ with tab2:
                         board_col2.metric("Latest Stress", f"{latest_stress:.2f}")
                         board_col3.metric("Latest Bank Beta", f"{latest_bank_beta:.4f}")
                         st.caption(
-                            "What to notice: a move from Dormant to Active or Stressed means rate sensitivity is broadening into a regime signal."
+                            "What to notice: a move from transmission dormant to transmission active or broadening means rate sensitivity is turning into a regime signal."
                         )
 
                     render_section_anchor("Empirical Terminal", "Signal board")
@@ -1046,11 +1354,11 @@ with tab2:
                         "This summary translates the signal board into a regime label before the downstream event and propagation evidence continue.",
                     )
                     if channel_state == "Stressed":
-                        regime_label = "Stress regime"
+                        regime_label = "Transmission broadening"
                     elif channel_state == "Active":
-                        regime_label = "Transmission regime"
+                        regime_label = "Transmission active"
                     elif channel_state == "Dormant":
-                        regime_label = "Dormant regime"
+                        regime_label = "Transmission dormant"
                     else:
                         regime_label = "Data-building regime"
                     st.markdown(
@@ -1230,6 +1538,11 @@ with tab3:
         "Macro & Credit",
         "Trace proxy evidence from deposits into the broader macro and credit system, then interpret the downstream pressure through the curve and credit lens.",
         "The deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive.",
+    )
+    render_state_label(
+        "Macro & Credit",
+        macro_state,
+        "This state condenses the curve, MMF migration proxy, and credit spillover backdrop.",
     )
     render_tab_purpose_strip(
         "How do macro and credit proxies map back to the channel?",
@@ -1488,6 +1801,11 @@ with tab4:
         "Work through preconditions, break, market interpretation, and counterfactual repair as a compact narrative arc.",
         "March 2023 broke when rate-sensitive funding met unrealized losses and the market treated the move as a confidence event.",
     )
+    render_state_label(
+        "Case Study",
+        case_state,
+        "This state says how strongly the March 2023 episode resembles the current pressure mix.",
+    )
     render_tab_purpose_strip(
         "What changed in the break, and what would have changed the outcome?",
         "You want a narrative comparison between the observed episode and the counterfactual path.",
@@ -1716,6 +2034,11 @@ with tab5:
         "Monitoring & Scenarios",
         "Close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last.",
         "The five-metric scorecard is an opening diagnostic, not a verdict.",
+    )
+    render_state_label(
+        "Monitoring",
+        monitoring_state,
+        "This state turns the live scorecard into a compact operational posture.",
     )
     render_tab_purpose_strip(
         "Which stress conditions should you monitor now?",

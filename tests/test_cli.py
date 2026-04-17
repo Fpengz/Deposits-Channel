@@ -128,7 +128,7 @@ def test_research_seminar_spine_labels_and_tabs_present() -> None:
 def test_empirical_terminal_signal_board_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "Signal Board" in content
-    assert "Dormant" in content
+    assert "Transmission dormant" in content
 
 
 def test_empirical_terminal_reads_like_research_seminar() -> None:
@@ -223,6 +223,48 @@ def test_guided_entry_orientation_preface_is_wired_into_page_flow() -> None:
         assert isinstance(arg, ast.Name)
         render_preface_args.append(arg.id)
     assert render_preface_args == ["start_date", "end_date"]
+
+
+def test_decision_layer_summary_band_is_wired_before_tabs() -> None:
+    content = APP_SOURCE.read_text()
+    module = ast.parse(content)
+
+    summary_node = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and _call_name(node.value) == "render_terminal_summary_band"
+    )
+    tabs_node = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Tuple) for target in node.targets)
+        and any(isinstance(target, ast.Name) and target.id == "tab1" for target in ast.walk(node))
+    )
+
+    assert "Top summary" in content
+    assert "Overall read" in content
+    assert "Action posture" in content
+    assert summary_node.lineno < tabs_node.lineno
+
+
+def test_each_tab_surfaces_a_compact_state_label() -> None:
+    content = APP_SOURCE.read_text()
+
+    for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
+        block = _extract_tab_block(content, tab_name)
+        assert "render_state_label(" in block
+
+    for label in [
+        '"Theory"',
+        '"Empirical"',
+        '"Macro & Credit"',
+        '"Case Study"',
+        '"Monitoring"',
+    ]:
+        assert label in content
 
 
 def test_tabs_include_orientation_strip_cues() -> None:
@@ -598,6 +640,9 @@ def test_visual_system_helpers_render_semantic_html() -> None:
     render_diagnostic_band = _load_app_helper(
         "render_diagnostic_band", {"st": fake_streamlit, "html": html}
     )
+    render_terminal_summary_band = _load_app_helper(
+        "render_terminal_summary_band", {"st": fake_streamlit, "html": html}
+    )
     render_takeaway_block = _load_app_helper(
         "render_takeaway_block", {"st": fake_streamlit, "html": html}
     )
@@ -613,14 +658,22 @@ def test_visual_system_helpers_render_semantic_html() -> None:
         "Use the scorecard first",
         body=render_metric_surface,
     )
+    render_terminal_summary_band(
+        "Transmission active but mixed",
+        "Watch",
+        "Empirical transmission broadening and monitoring stable, with mixed signals across the highest-weight tabs.",
+        "Empirical Terminal for the live market evidence.",
+        "Mixed signal across high-weight tabs",
+    )
     render_takeaway_block("Lead with the surface <scan> before the narrative.")
 
-    assert len(calls) == 4
+    assert len(calls) == 5
 
     banner_body, banner_allow_html = calls[0]
     band_body, band_allow_html = calls[1]
     wrapped_surface_body, wrapped_surface_allow_html = calls[2]
-    takeaway_body, takeaway_allow_html = calls[3]
+    summary_body, summary_allow_html = calls[3]
+    takeaway_body, takeaway_allow_html = calls[4]
 
     assert banner_allow_html is True
     assert '<div class="seminar-banner">' in banner_body
@@ -639,6 +692,13 @@ def test_visual_system_helpers_render_semantic_html() -> None:
 
     assert wrapped_surface_allow_html is True
     assert wrapped_surface_body == "<span>metric surface</span>"
+
+    assert summary_allow_html is True
+    assert '<div class="summary-band">' in summary_body
+    assert "Top summary" in summary_body
+    assert "Overall read" in summary_body
+    assert "Action posture" in summary_body
+    assert "Mixed signal across high-weight tabs" in summary_body
 
     assert takeaway_allow_html is True
     assert '<div class="takeaway-block">' in takeaway_body
