@@ -626,3 +626,10 @@ def test_tabs_use_seminar_banners_and_diagnostic_bands() -> None:
         block = _extract_tab_block(content, tab_name)
         assert "render_seminar_banner(" in block
         assert "render_diagnostic_band(" in block
+
+
+def test_future_navigation_anchors_are_not_missing_from_app_source() -> None:
+    content = APP_SOURCE.read_text()
+
+    for anchor in ["Jump to section", "Read this next", "Continue in"]:
+        assert anchor in content
