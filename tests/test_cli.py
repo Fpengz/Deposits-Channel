@@ -673,3 +673,13 @@ def test_tabs_include_section_navigator_helper_usage() -> None:
     for tab_name in ["tab1", "tab2", "tab3", "tab4", "tab5"]:
         block = _extract_tab_block(content, tab_name)
         assert "render_section_navigator(" in block
+
+
+def test_navigation_layer_is_present_without_heavy_chrome() -> None:
+    content = APP_SOURCE.read_text()
+
+    assert "Jump to section" in content
+    assert content.count("render_section_navigator(") >= 5
+    assert 4 <= content.count("Read this next") <= 6
+    assert 3 <= content.count("Continue in") <= 5
+    assert content.count("If you only look at one chart") <= 2

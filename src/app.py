@@ -173,6 +173,25 @@ VISUAL_SYSTEM_CSS = """
     transform: translateY(-1px);
 }
 
+@media (max-width: 1280px) {
+    .section-navigator {
+        padding: 0.75rem 0.85rem;
+    }
+
+    .section-navigator p {
+        margin-bottom: 0.45rem;
+    }
+
+    .section-navigator__items {
+        gap: 0.3rem;
+    }
+
+    .section-navigator__link {
+        padding: 0.3rem 0.55rem;
+        font-size: 0.84rem;
+    }
+}
+
 .takeaway-block {
     padding: 1rem 1.1rem;
     background: var(--accent-soft);
@@ -284,7 +303,6 @@ def render_section_anchor(tab_title: str, section_label: str) -> None:
 
 
 def render_section_navigator(title: str, sections: list[str]) -> None:
-    # Later tasks will add the broader "Continue in" cues.
     section_links = "".join(
         f'<a class="section-navigator__link" href="#{_section_anchor(title, section)}">'
         f"{html.escape(section)}</a>"
