@@ -558,7 +558,7 @@ with tab2:
                 st.plotly_chart(fig_ts, width="stretch")
 
                 # Q1 continued: Sector Sensitivity
-                st.subheader("Q1 Deep Dive: Interest Rate Betas")
+                st.subheader("Q1: Interest Rate Betas")
                 res_kbe = run_ols_regression(data, "r_kbe", "d_ff")
                 res_spy = run_ols_regression(data, "r_spy", "d_ff")
                 col1, col2 = st.columns(2)
@@ -718,8 +718,8 @@ with tab2:
                     )
                     st.plotly_chart(fig_car, width="stretch")
 
-                # Q4 Deep Dive
-                st.subheader("Q4 Deep Dive: Rolling Beta Heatmap")
+                # Q4 continued: Rolling Beta Heatmap
+                st.subheader("Q4: Rolling Beta Heatmap")
                 beta_kbe = calculate_rolling_beta(data, "r_kbe", "d_ff", window=252)
                 beta_iat = calculate_rolling_beta(data, "r_iat", "d_ff", window=252)
                 beta_spy = calculate_rolling_beta(data, "r_spy", "d_ff", window=252)
@@ -862,7 +862,7 @@ with tab3:
         )
         st.plotly_chart(fig_mmf, width="stretch")
 
-        st.subheader("Q1 Deep Dive: Banks vs MMFs (Relative Performance)")
+        st.subheader("Q1: Banks vs MMFs (Relative Performance)")
         rel = macro_data["KBE"] / macro_data["MMF_Price"]
         rel = rel / rel.iloc[0]
         fig_rel = go.Figure()
@@ -981,7 +981,7 @@ with tab3:
             "When rates rise and deposits exit, banks must contract their balance sheets, leading to lower credit availability and higher spreads."
         )
 
-        st.subheader("Q3 Deep Dive: Credit Stress vs Bank Returns")
+        st.subheader("Q3: Credit Stress vs Bank Returns")
         credit_data["r_kbe"] = credit_data["KBE"].pct_change()
         credit_data["r_iat"] = credit_data["IAT"].pct_change()
         credit_scatter = credit_data.dropna()
@@ -1226,7 +1226,12 @@ with tab4:
 
 with tab5:
     st.header("Monitoring & Scenarios")
-    st.markdown("Use this section to track live signals and frame forward-looking stress cases.")
+    st.markdown(
+        "We close the seminar by turning live signals into a practical reading order: scorecard first, scenarios second, playbook last."
+    )
+    st.markdown(
+        "**Short answer:** the five-metric scorecard is an opening diagnostic, not a verdict; it tells you whether the channel is live enough to justify the scenarios and playbook that follow."
+    )
     monitoring_frame = pd.DataFrame()
     if not merged.empty:
         monitoring_frame = merged[
@@ -1253,7 +1258,9 @@ with tab5:
         scorecard_col3.metric("Curve regime", "N/A")
         scorecard_col4.metric("MMF pressure", "N/A")
         scorecard_col5.metric("Credit stress trend", "N/A")
-        st.caption("Scorecard updates when the selected timeframe has overlapping market data.")
+        st.markdown(
+            "**What to notice:** without overlapping market data, the scorecard cannot support a regime read, so the seminar close stays at the diagnostic stage."
+        )
     else:
         scorecard_frame = monitoring_frame.copy()
         scorecard_frame["d_ff"] = scorecard_frame["FF_Proxy"].diff()
@@ -1323,11 +1330,14 @@ with tab5:
         scorecard_col3.metric("Curve regime", curve_value, delta=curve_delta)
         scorecard_col4.metric("MMF pressure", mmf_value, delta=mmf_delta)
         scorecard_col5.metric("Credit stress trend", credit_value, delta=credit_delta)
-        st.caption(
-            "Read left to right: stress, bank beta, curve, MMFs, and credit should align before the regime turns persistent."
+        st.markdown(
+            "**What to notice:** the board matters most when stress, bank beta, curve, MMFs, and credit all point the same way; any split says the channel is still forming rather than fully settled."
         )
 
     st.subheader("Scenario Cards")
+    st.markdown(
+        "These scenarios are the seminar close in compact form: each card turns the scorecard into a forward-looking check on how the channel could behave next."
+    )
 
     def render_scenario_card(
         title: str,
@@ -1415,6 +1425,11 @@ with tab5:
         "MMF outperformance alongside negative bank beta says the deposit trade is still live.",
         "Favor banks with stickier funding and less reliance on hot money.",
         "Treat the combination as an active migration signal, not a benign rotation.",
+    )
+
+    st.subheader("Audience Takeaways")
+    st.markdown(
+        "**Takeaway:** researchers should use the scorecard to classify the regime, investors should use the scenarios to pressure-test exposures, and policy users should use the playbook to decide when monitoring needs to tighten."
     )
 
 st.divider()

@@ -193,10 +193,33 @@ def test_monitoring_tab_present() -> None:
     assert "Monitoring & Scenarios" in content
 
 
+def test_monitoring_tab_reads_like_the_seminar_close() -> None:
+    content = APP_SOURCE.read_text()
+    monitoring_block = _extract_tab_block(content, "tab5")
+
+    assert "Monitoring & Scenarios" in monitoring_block
+    assert "**Short answer:**" in monitoring_block
+    assert "scorecard" in monitoring_block.lower()
+    assert "If this, then that playbook" in monitoring_block
+    assert "audience takeaways" in monitoring_block.lower()
+
+
 def test_monitoring_playbook_labels_present() -> None:
     content = Path("src/app.py").read_text()
     assert "If this, then that playbook" in content
     assert "Higher for longer" in content
+
+
+def test_editorial_consistency_keeps_seminar_anchors_balanced() -> None:
+    content = APP_SOURCE.read_text()
+    monitoring_block = _extract_tab_block(content, "tab5")
+
+    assert content.count("**Short answer:**") >= 5
+    assert content.count("**What to notice:**") >= 5
+    assert "Audience Takeaways" in monitoring_block
+    assert "**Short answer:**" in monitoring_block
+    assert "**What to notice:**" in monitoring_block
+    assert "**Takeaway:**" in monitoring_block
 
 
 def test_monitoring_tab_matches_planned_structure() -> None:
