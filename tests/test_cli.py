@@ -356,3 +356,15 @@ def test_recent_change_reports_actual_horizon_used_in_ui_labels() -> None:
     assert change == pytest.approx(0.14)
     assert 'mmf_delta = f"{mmf_horizon}d={mmf_trend:+.1%}"' in content
     assert 'credit_delta = f"{credit_horizon}d={credit_trend:+.1%}"' in content
+
+
+def test_visual_system_guardrail_anchors_are_present_in_app_source() -> None:
+    content = APP_SOURCE.read_text()
+
+    for anchor in [
+        "seminar-banner",
+        "diagnostic-band",
+        "research-module",
+        "takeaway-block",
+    ]:
+        assert anchor in content
