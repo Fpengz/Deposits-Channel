@@ -180,16 +180,30 @@ def test_empirical_terminal_warns_and_skips_when_filtered_data_is_empty() -> Non
     assert "if data.empty:" in content
 
 
-def test_guided_entry_orientation_anchors_present() -> None:
-    content = Path("src/app.py").read_text()
+def test_guided_entry_orientation_preface_renders_selected_sample_context() -> None:
+    calls: list[tuple[str, bool]] = []
 
-    for marker in [
-        "How to read this terminal",
-        "Question:",
-        "Use this when:",
-        "Start here:",
-    ]:
-        assert marker in content
+    class FakeStreamlit:
+        def markdown(self, body: str, unsafe_allow_html: bool = False) -> None:
+            calls.append((body, unsafe_allow_html))
+
+    render_reading_preface = _load_app_helper(
+        "render_reading_preface", {"st": FakeStreamlit(), "html": html, "pd": pd}
+    )
+
+    render_reading_preface(pd.Timestamp("2024-01-01"), pd.Timestamp("2024-03-31"))
+
+    assert len(calls) == 1
+    body, allow_html = calls[0]
+    assert allow_html is True
+    assert '<div class="seminar-banner">' in body
+    assert "How to read this terminal" in body
+    assert "Start here:" in body
+    assert "selected sample" in body.lower()
+    assert "Sample context:" in body
+    assert "Jan 01, 2024" in body
+    assert "Mar 31, 2024" in body
+    assert "Question:" in body
 
 
 def test_macro_regime_matrix_labels_present() -> None:

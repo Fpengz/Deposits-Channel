@@ -1,6 +1,7 @@
 import html
 import warnings
 from collections.abc import Callable
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -216,11 +217,26 @@ def render_takeaway_block(text: str) -> None:
     )
 
 
+def render_reading_preface(
+    sample_start: date | pd.Timestamp, sample_end: date | pd.Timestamp
+) -> None:
+    sample_start_label = pd.to_datetime(sample_start).strftime("%b %d, %Y")
+    sample_end_label = pd.to_datetime(sample_end).strftime("%b %d, %Y")
+    st.markdown(
+        f"""
+        <div class="seminar-banner">
+          <div class="module-kicker">How to read this terminal</div>
+          <h2>How to read this terminal</h2>
+          <p>Start here: read the opening mechanism, then use the selected sample in the sidebar as the common frame for the evidence below.</p>
+          <p>Sample context: the current sample runs from {html.escape(sample_start_label)} to {html.escape(sample_end_label)}. If a panel says the data are unavailable, treat that as a coverage note for this sample rather than a change in the underlying story.</p>
+          <p class="short-answer"><strong>Question:</strong> Which part of the deposits channel is under pressure in the selected sample?</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 st.title("The Deposits Channel: Macro-Finance Terminal v4.0")
-st.markdown("""
-This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)** across multiple asset classes. 
-Use the tabs below to explore the "Flow of Funds", Yield Curve interactions, and recent banking stress.
-""")
 
 # Sidebar Navigation & Global Filters
 st.sidebar.title("Terminal Controls")
@@ -228,6 +244,12 @@ st.sidebar.divider()
 st.sidebar.subheader("Global Timeframe")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2018-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
+
+render_reading_preface(start_date, end_date)
+st.markdown("""
+This terminal explores the mechanics of **Drechsler, Savov & Schnabl (2017)** across multiple asset classes.
+Use the tabs below to explore the "Flow of Funds", Yield Curve interactions, and recent banking stress.
+""")
 
 # Global data fetch (shared across tabs)
 with st.spinner("Fetching market data..."):
