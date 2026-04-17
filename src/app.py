@@ -819,7 +819,12 @@ with tab2:
 
 with tab3:
     st.header("Macro & Credit")
-    st.markdown("Follow the funding flow from deposits into the broader macro and credit system.")
+    st.markdown(
+        "Follow the funding flow from deposits into the broader macro and credit system: first deposits move toward MMFs, then the curve and credit conditions absorb the pressure."
+    )
+    st.markdown(
+        "**Short answer:** the pressure moves from deposits to MMFs, then into the curve, and finally into credit conditions; the deposit and MMF comparisons are proxy-based, while the curve and credit read-throughs are interpretive."
+    )
 
     if not ff_proxy.empty and not mmf_proxy.empty and not tnx_proxy.empty and not kbe_proxy.empty:
         macro_merged = (
@@ -836,7 +841,9 @@ with tab3:
 
         # Q1. Deposit Destination
         st.subheader("Q1: Where do deposits go when spreads widen?")
-        st.markdown("We proxy flows by comparing bank equities to money market funds.")
+        st.markdown(
+            "We proxy flows by comparing bank equities to money market funds; this is the observable stand-in for deposit migration, not a literal flow measure."
+        )
         fig_mmf = go.Figure()
         fig_mmf.add_trace(
             go.Scatter(
@@ -924,6 +931,9 @@ with tab3:
         )
         st.markdown(
             "**Policy/risk takeaway:** Crisis conditions call for tighter liquidity surveillance and faster confidence backstops."
+        )
+        st.markdown(
+            "The credit section below is a downstream consequence of this earlier flow-of-funds story: once deposits leak toward MMFs and the curve compresses, credit conditions usually tighten afterward."
         )
 
 with tab3:
@@ -1030,7 +1040,12 @@ with tab3:
 
 with tab4:
     st.header("Case Study: March 2023 Banking Stress")
-    st.markdown("A nonlinear shock reveals how quickly the deposits channel can break.")
+    st.markdown(
+        "We open this case as a compact narrative arc: preconditions, break, market interpretation, and counterfactual repair."
+    )
+    st.markdown(
+        "**Short answer:** March 2023 broke when rate-sensitive funding met unrealized losses, the market interpreted the move as a confidence event, and the counterfactuals ask what would have changed the outcome."
+    )
     st.markdown("""
     March 2023 represented a 'nonlinear' shock where the Deposits Channel mechanism reached a breaking point 
     for regional banks like SVB.
@@ -1045,8 +1060,13 @@ with tab4:
         crisis_data = merged[(merged.index >= crisis_start) & (merged.index <= crisis_end)]
 
         if not crisis_data.empty:
-            st.subheader("Q1: What broke in March 2023?")
-            st.markdown("Regional banks diverged as deposit outflows and AOCI losses accelerated.")
+            st.subheader("Q1: Preconditions -> Break")
+            st.markdown(
+                "The preconditions were rate pressure, large unrealized bond losses, and a funding base that could not absorb fast deposit outflows."
+            )
+            st.markdown(
+                "The break came when regional banks diverged as deposit outflows and AOCI losses accelerated."
+            )
             st.markdown(
                 "**Timeline:** February rate pressure hit bond values, March 10 marked the SVB collapse, and the following days became a system-wide confidence test."
             )
@@ -1088,7 +1108,7 @@ with tab4:
               further increasing their market power.
             """)
 
-            st.subheader("Q2: How big was the divergence?")
+            st.subheader("Q2: Market interpretation")
             st.markdown("Normalize KBE and IAT to visualize cumulative separation.")
             kbe_norm = crisis_data["KBE"] / crisis_data["KBE"].iloc[0]
             iat_norm = crisis_data["IAT"] / crisis_data["IAT"].iloc[0]
@@ -1106,7 +1126,7 @@ with tab4:
             )
             st.plotly_chart(fig_div, width="stretch")
 
-            st.subheader("Q3: What were the channels of damage?")
+            st.subheader("Q3: Market interpretation -> channel mechanics")
             st.markdown(
                 "An illustrative waterfall decomposes the impact into deposits, AOCI, and equity divergence."
             )
@@ -1138,9 +1158,9 @@ with tab4:
                 "**Waterfall framing:** the damage compounded in sequence as deposit flight exposed bond losses and then widened the equity penalty for regionals."
             )
 
-            st.subheader("Q4: What would have reduced the damage?")
+            st.subheader("Q4: Counterfactual repair")
             st.markdown(
-                "We run simple counterfactuals to show which balance-sheet choices would have softened the shock."
+                "We run simple counterfactuals to show which balance-sheet choices would have changed the outcome, not just softened the optics after the fact."
             )
             counterfactuals = {
                 "Lower duration": counterfactual_channel_impact(
@@ -1164,7 +1184,7 @@ with tab4:
             }
             st.dataframe(pd.DataFrame(counterfactuals).T, width="stretch")
             st.markdown(
-                "**What to notice:** lower duration and stickier deposits shrink the crisis path before equity divergence spirals."
+                "**What to notice:** lower duration would have reduced mark-to-market losses, stickier deposits would have slowed the run, and a less concentrated system would have weakened the feedback loop."
             )
 
             st.subheader("Takeaway")

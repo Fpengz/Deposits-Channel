@@ -147,10 +147,37 @@ def test_macro_regime_matrix_labels_present() -> None:
     assert "Crisis" in content
 
 
+def test_macro_tab_uses_flow_of_funds_seminar_framing() -> None:
+    content = Path("src/app.py").read_text()
+    macro_block = _extract_tab_block(content, "tab3")
+
+    assert "Follow the funding flow" in macro_block
+    assert "**Short answer:**" in macro_block
+    assert "proxy-based" in macro_block
+    assert "interpretive" in macro_block
+    assert "downstream consequence" in macro_block
+
+
 def test_case_study_counterfactual_labels_present() -> None:
     content = Path("src/app.py").read_text()
-    assert "Q4: What would have reduced the damage?" in content
+    assert "Q4: Counterfactual repair" in content
     assert "Lower duration" in content
+
+
+def test_case_study_uses_narrative_arc_framing() -> None:
+    content = Path("src/app.py").read_text()
+    case_block = _extract_tab_block(content, "tab4")
+
+    assert "March 2023 Banking Stress" in case_block
+    assert "**Short answer:**" in case_block
+    for marker in [
+        "preconditions",
+        "break",
+        "market interpretation",
+        "counterfactual repair",
+    ]:
+        assert marker in case_block
+    assert "what would have changed the outcome" in case_block
 
 
 def test_monitoring_tab_present() -> None:
