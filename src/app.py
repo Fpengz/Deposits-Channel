@@ -614,7 +614,7 @@ with tab2:
                 )
                 if stress.dropna().empty:
                     st.warning(
-                        "The empirical board and stress composite could not be assembled for this sample, so the remaining empirical sections are omitted."
+                        "The empirical board and stress composite could not be assembled for this sample, so the signal board and regime summary are unavailable."
                     )
                 else:
                     threshold = stress.quantile(0.95)

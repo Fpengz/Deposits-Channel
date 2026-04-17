@@ -120,7 +120,7 @@ def test_empirical_terminal_reads_like_research_seminar() -> None:
 
     assert "The selected timeframe leaves no overlapping observations" in empirical_block
     assert re.search(
-        r"empirical board and stress composite.*(?:omitted|unavailable)",
+        r"empirical board and stress composite.*signal board and regime summary are unavailable",
         empirical_block,
         re.IGNORECASE | re.DOTALL,
     )
